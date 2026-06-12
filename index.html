@@ -2244,9 +2244,9 @@ Responde ÚNICAMENTE con JSON válido sin markdown:
 Valores deben ser técnicamente correctos para ese vehículo.`;
 
   try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'llama-3.3-70b-versatile',max_tokens:600,messages:[{role:'user',content:prompt}]})});
     const data=await r.json();
-    const txt=data.content.map(i=>i.text||'').join('');
+    const txt=data?.choices?.[0]?.message?.content||'';
     const parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
     showResult(parsed,m,mo,obj);
   }catch(err){
@@ -2919,13 +2919,19 @@ RESPUESTAS CORTAS y naturales (máx 4-5 líneas por mensaje). No uses listas con
   async function kcCallAI(userText){
     kcShowTyping();
 
-    const history = kcState.messages
-      .filter(m => m.text && m.text.trim())
-      .slice(-20)
-      .map(m => ({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text
-      }));
+    // Construir historial: solo alternar user/assistant, siempre empezar con user
+    const allMessages = kcState.messages.filter(m => m.text && m.text.trim());
+    const history = [];
+    for(const m of allMessages){
+      const role = m.role === 'user' ? 'user' : 'assistant';
+      // Evitar dos mensajes seguidos del mismo rol
+      if(history.length > 0 && history[history.length - 1].role === role) continue;
+      history.push({ role, content: m.text });
+    }
+    // Groq requiere que el primer mensaje sea del user
+    while(history.length > 0 && history[0].role !== 'user') history.shift();
+    // Limitar a últimos 20
+    const trimmed = history.slice(-20);
 
     try {
       const response = await fetch('/api/chat', {
@@ -2936,7 +2942,7 @@ RESPUESTAS CORTAS y naturales (máx 4-5 líneas por mensaje). No uses listas con
           max_tokens: 1000,
           messages: [
             { role: 'system', content: buildSystemPrompt() },
-            ...history
+            ...trimmed
           ]
         })
       });
