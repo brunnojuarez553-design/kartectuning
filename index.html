@@ -1,0 +1,3276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KARTEC TUNING — Performance Engineering Venezuela</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ════════════════════════════════════════
+   DESIGN TOKENS — KARTEC V2 MIAMI
+════════════════════════════════════════ */
+:root {
+  --ink:        #040404;
+  --ink-1:      #0a0a0a;
+  --ink-2:      #111111;
+  --ink-3:      #181818;
+  --ink-4:      #222222;
+
+  --copper:     #C8751F;
+  --copper-lt:  #E8862A;
+  --copper-10:  rgba(200,117,31,0.10);
+  --copper-20:  rgba(200,117,31,0.20);
+  --copper-40:  rgba(200,117,31,0.40);
+
+  /* Signature accent — fire red for gain deltas */
+  --fire:       #FF3B1A;
+  --fire-20:    rgba(255,59,26,0.20);
+
+  --white:      #F0EDE8;
+  --white-60:   rgba(240,237,232,0.60);
+  --white-35:   rgba(240,237,232,0.35);
+  --white-15:   rgba(240,237,232,0.15);
+  --white-07:   rgba(240,237,232,0.07);
+
+  --f-display:  'Syne', sans-serif;
+  --f-head:     'Space Grotesk', sans-serif;
+  --f-body:     'Inter', sans-serif;
+  --f-mono:     'Rajdhani', sans-serif;
+
+  --ease-out:   cubic-bezier(0.22,1,0.36,1);
+  --ease-circ:  cubic-bezier(0.85,0,0.15,1);
+  --r:          0px; /* zero radius — industrial precision */
+}
+
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; font-size:16px; }
+body {
+  background: var(--ink);
+  color: var(--white);
+  font-family: var(--f-body);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width:3px; }
+::-webkit-scrollbar-track { background:var(--ink); }
+::-webkit-scrollbar-thumb { background:var(--copper); }
+
+/* ── SELECTION ── */
+::selection { background:var(--copper); color:var(--ink); }
+
+/* ════════════════════════════════════════
+   CURSOR — Technical crosshair
+════════════════════════════════════════ */
+.cursor {
+  position:fixed; top:0; left:0; pointer-events:none; z-index:9999;
+  width:20px; height:20px;
+  transform:translate(-50%,-50%);
+}
+.cursor::before, .cursor::after {
+  content:'';
+  position:absolute; background:var(--copper);
+  transition:transform 0.15s var(--ease-out), opacity 0.2s;
+}
+.cursor::before { width:1px; height:100%; left:50%; top:0; }
+.cursor::after  { width:100%; height:1px; top:50%; left:0; }
+
+.cursor-ring {
+  position:fixed; top:0; left:0; pointer-events:none; z-index:9998;
+  width:36px; height:36px;
+  border:1px solid rgba(200,117,31,0.5);
+  transform:translate(-50%,-50%) rotate(45deg);
+  transition:transform 0.22s var(--ease-out), width 0.3s, height 0.3s, border-color 0.3s;
+}
+body:has(a:hover) .cursor-ring,
+body:has(button:hover) .cursor-ring {
+  width:52px; height:52px; border-color:var(--copper);
+}
+
+/* ════════════════════════════════════════
+   NAVIGATION
+════════════════════════════════════════ */
+nav {
+  position:fixed; top:0; left:0; right:0; z-index:800;
+  height:72px; display:flex; align-items:center;
+  padding:0 60px;
+  transition:background 0.5s, border-color 0.5s;
+  border-bottom:1px solid transparent;
+}
+nav.s {
+  background:rgba(4,4,4,0.94);
+  backdrop-filter:blur(24px) saturate(1.5);
+  border-bottom-color:rgba(200,117,31,0.18);
+}
+.nav-logo {
+  font-family:var(--f-display);
+  font-size:17px; font-weight:800; letter-spacing:0.12em;
+  color:var(--white); text-decoration:none;
+  display:flex; align-items:center; gap:14px; flex-shrink:0;
+}
+.nav-logo img {
+  height:56px; width:auto;
+  object-fit:contain;
+  filter:brightness(1.05);
+}
+.nav-links {
+  display:flex; gap:44px; list-style:none;
+  margin:0 auto;
+}
+.nav-links a {
+  font-family:var(--f-body); font-weight:500;
+  font-size:13px; letter-spacing:0.06em;
+  color:var(--white-35); text-decoration:none;
+  transition:color 0.2s; position:relative;
+}
+.nav-links a::after {
+  content:''; position:absolute; bottom:-6px; left:0; right:0; height:1px;
+  background:var(--copper); transform:scaleX(0); transform-origin:left;
+  transition:transform 0.3s var(--ease-out);
+}
+.nav-links a:hover { color:var(--white); }
+.nav-links a:hover::after { transform:scaleX(1); }
+.nav-action {
+  display:flex; align-items:center; gap:8px;
+  background:transparent; border:1px solid var(--copper-40);
+  color:var(--copper); padding:10px 24px; cursor:pointer;
+  font-family:var(--f-mono); font-weight:700;
+  font-size:12px; letter-spacing:0.15em; text-transform:uppercase;
+  text-decoration:none;
+  transition:all 0.25s;
+  clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+  position:relative; overflow:hidden;
+}
+.nav-action::before {
+  content:''; position:absolute; inset:0;
+  background:var(--copper); transform:translateX(-100%);
+  transition:transform 0.3s var(--ease-out); z-index:0;
+}
+.nav-action:hover::before { transform:translateX(0); }
+.nav-action:hover { color:var(--ink); }
+.nav-action > * { position:relative; z-index:1; }
+
+/* ════════════════════════════════════════
+   HERO — Cinematic split layout
+════════════════════════════════════════ */
+#hero {
+  position:relative; height:100vh; min-height:740px;
+  display:grid; align-items:center;
+  overflow:hidden;
+  background:transparent;
+}
+
+/* Atmospheric grid overlay — subtle tech texture */
+#hero::before {
+  content:'';
+  position:absolute; inset:0; z-index:1; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(200,117,31,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200,117,31,0.035) 1px, transparent 1px);
+  background-size:80px 80px;
+  mask-image:radial-gradient(ellipse 70% 70% at 60% 50%, black 0%, transparent 100%);
+}
+
+/* Diagonal signature slash */
+.hero-slash {
+  position:absolute; top:0; right:0; bottom:0;
+  width:56%; pointer-events:none; z-index:2;
+  overflow:hidden;
+}
+.hero-slash::before {
+  content:'';
+  position:absolute; top:-20%; left:-5%;
+  width:2px; height:160%;
+  background:linear-gradient(180deg,transparent 0%,var(--copper) 25%,var(--copper-lt) 55%,transparent 100%);
+  transform:rotate(-6deg); transform-origin:top;
+  opacity:0.5;
+}
+.hero-slash::after {
+  content:'';
+  position:absolute; top:-20%; left:calc(-5% + 18px);
+  width:1px; height:160%;
+  background:linear-gradient(180deg,transparent 0%,var(--copper-20) 35%,transparent 100%);
+  transform:rotate(-6deg); transform-origin:top;
+}
+
+/* Fullscreen hero video background */
+.hero-video-bg {
+  position:absolute; inset:0; z-index:0;
+  overflow:hidden;
+}
+.hero-video-bg video {
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  object-fit:cover;
+  object-position:center;
+}
+.hero-video-bg::after {
+  content:'';
+  position:absolute; inset:0; z-index:1;
+  background:
+    linear-gradient(90deg, rgba(4,4,4,0.88) 0%, rgba(4,4,4,0.60) 50%, rgba(4,4,4,0.35) 100%),
+    linear-gradient(180deg, rgba(4,4,4,0.50) 0%, transparent 40%, rgba(4,4,4,0.75) 100%);
+}
+
+.hero-slash { display:none; }
+/* Right panel — kept for slash/scanline stacking; img hidden */
+.hero-visual {
+  position:absolute; top:0; right:0; bottom:0; width:52%;
+  overflow:hidden; pointer-events:none;
+}
+.hero-visual-img { display:none; }
+.hero-visual::after { content:''; position:absolute; inset:0; background:transparent; }
+
+/* Scan line — dyno data aesthetic, the signature element */
+.hero-scanline {
+  position:absolute; top:0; right:0; bottom:0; width:52%;
+  pointer-events:none; z-index:3; overflow:hidden;
+}
+.hero-scanline::before {
+  content:'';
+  position:absolute; left:0; right:0; height:1px;
+  background:linear-gradient(90deg,transparent,var(--copper-40),transparent);
+  animation:scan 5s cubic-bezier(0.45,0,0.55,1) infinite;
+  animation-delay:2s;
+}
+@keyframes scan {
+  0%   { top:0%; opacity:0; }
+  5%   { opacity:1; }
+  95%  { opacity:1; }
+  100% { top:100%; opacity:0; }
+}
+
+/* Big background number */
+.hero-bg-num {
+  position:absolute; bottom:-60px; right:1%;
+  font-family:var(--f-display); font-size:clamp(180px,20vw,300px);
+  font-weight:800; line-height:1; letter-spacing:-0.04em;
+  color:transparent;
+  -webkit-text-stroke:1px rgba(200,117,31,0.09);
+  pointer-events:none; z-index:4; user-select:none;
+}
+
+/* Left content */
+.hero-content {
+  position:relative; z-index:5;
+  padding:0 60px; max-width:700px;
+  padding-top:72px;
+}
+.hero-tag {
+  display:inline-flex; align-items:center; gap:12px;
+  margin-bottom:36px; opacity:0;
+  animation:fadeUp 0.8s var(--ease-out) 0.3s forwards;
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(20px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.hero-tag-line { width:36px; height:1px; background:var(--copper); }
+.hero-tag-text {
+  font-family:var(--f-mono); font-weight:700;
+  font-size:11px; letter-spacing:0.32em; text-transform:uppercase;
+  color:var(--copper);
+}
+
+.hero-title {
+  font-family:var(--f-display);
+  font-size:clamp(52px,6.5vw,90px);
+  font-weight:800; line-height:0.94;
+  letter-spacing:-0.04em; color:var(--white);
+  margin-bottom:32px;
+  opacity:0; animation:fadeUp 0.9s var(--ease-out) 0.5s forwards;
+}
+.hero-title span { color:var(--copper); }
+
+.hero-body {
+  font-size:16px; line-height:1.8; font-weight:400;
+  color:var(--white-60); max-width:460px;
+  margin-bottom:52px;
+  opacity:0; animation:fadeUp 0.9s var(--ease-out) 0.7s forwards;
+}
+
+.hero-ctas {
+  display:flex; gap:14px; flex-wrap:wrap;
+  opacity:0; animation:fadeUp 0.9s var(--ease-out) 0.9s forwards;
+}
+
+/* Bottom stats */
+.hero-data {
+  position:absolute; bottom:0; left:0; right:48%;
+  border-top:1px solid var(--white-07);
+  display:flex; z-index:5;
+}
+.hd-item {
+  flex:1; padding:24px 30px;
+  border-right:1px solid var(--white-07);
+  position:relative;
+}
+.hd-item::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,var(--copper),transparent);
+  transform:scaleX(0); transform-origin:left;
+  transition:transform 0.6s var(--ease-out);
+}
+.hd-item:hover::before { transform:scaleX(1); }
+.hd-val {
+  font-family:var(--f-display); font-size:40px; font-weight:800;
+  color:var(--copper); line-height:1; display:block; margin-bottom:6px;
+  letter-spacing:-0.02em;
+}
+.hd-lbl {
+  font-family:var(--f-body); font-size:11px; font-weight:500;
+  letter-spacing:0.12em; text-transform:uppercase; color:var(--white-35);
+}
+
+/* ════════════════════════════════════════
+   TICKER
+════════════════════════════════════════ */
+.ticker {
+  height:44px; overflow:hidden; position:relative;
+  background:var(--ink-1);
+  border-top:1px solid rgba(200,117,31,0.15);
+  border-bottom:1px solid rgba(200,117,31,0.15);
+  display:flex; align-items:center;
+}
+.ticker-track {
+  display:flex; gap:0; white-space:nowrap;
+  animation:tick 35s linear infinite;
+}
+.ticker-track span {
+  font-family:var(--f-mono); font-size:11px; font-weight:600;
+  letter-spacing:0.22em; text-transform:uppercase; padding:0 36px;
+  color:var(--white-35);
+}
+.ticker-track span.k { color:var(--copper); font-weight:700; }
+@keyframes tick { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* ════════════════════════════════════════
+   SHARED BUTTONS
+════════════════════════════════════════ */
+.btn-copper {
+  display:inline-flex; align-items:center; gap:10px;
+  background:var(--copper);
+  color:var(--ink); border:none; cursor:pointer;
+  font-family:var(--f-mono); font-weight:800;
+  font-size:12px; letter-spacing:0.2em; text-transform:uppercase;
+  padding:16px 34px; text-decoration:none;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  transition:all 0.3s var(--ease-out); position:relative; overflow:hidden;
+}
+.btn-copper::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent);
+  transform:translateX(-100%); transition:transform 0.5s;
+}
+.btn-copper:hover::before { transform:translateX(100%); }
+.btn-copper:hover { background:var(--copper-lt); box-shadow:0 0 48px var(--copper-40); }
+.btn-ghost {
+  display:inline-flex; align-items:center; gap:10px;
+  background:transparent; border:1px solid var(--white-15);
+  color:var(--white-60); cursor:pointer;
+  font-family:var(--f-mono); font-weight:700;
+  font-size:12px; letter-spacing:0.15em; text-transform:uppercase;
+  padding:15px 34px; text-decoration:none;
+  transition:all 0.25s;
+}
+.btn-ghost:hover { border-color:var(--copper-40); color:var(--white); }
+
+/* ════════════════════════════════════════
+   SHARED LAYOUT
+════════════════════════════════════════ */
+.wrap { max-width:1260px; margin:0 auto; padding:0 60px; }
+section.pad { padding:128px 0; }
+
+.eyebrow {
+  display:flex; align-items:center; gap:14px; margin-bottom:16px;
+}
+.eyebrow-line { width:28px; height:1px; background:var(--copper); flex-shrink:0; }
+.eyebrow-text {
+  font-family:var(--f-mono); font-size:11px; font-weight:700;
+  letter-spacing:0.32em; text-transform:uppercase; color:var(--copper);
+}
+.h2 {
+  font-family:var(--f-display); font-size:clamp(34px,4vw,58px);
+  font-weight:800; line-height:0.97; letter-spacing:-0.035em; color:var(--white);
+}
+.h2 em { font-style:normal; color:var(--copper); }
+
+/* ════════════════════════════════════════
+   SERVICES — Technical spec-sheet
+════════════════════════════════════════ */
+#services { background:var(--ink); }
+.sv-header { margin-bottom:80px; display:flex; justify-content:space-between; align-items:flex-end; }
+.sv-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:0;
+  border:1px solid var(--white-07);
+}
+
+.sv-card {
+  background:var(--ink-1);
+  padding:48px 40px;
+  position:relative; overflow:hidden;
+  transition:background 0.4s; cursor:default;
+  border-right:1px solid var(--white-07);
+  border-bottom:1px solid var(--white-07);
+}
+.sv-card:nth-child(3n) { border-right:none; }
+.sv-card:nth-child(n+4) { border-bottom:none; }
+
+/* Left accent bar on hover */
+.sv-card::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:2px;
+  background:linear-gradient(180deg,var(--copper),var(--copper-lt));
+  transform:scaleY(0); transform-origin:bottom;
+  transition:transform 0.45s var(--ease-out);
+}
+.sv-card:hover::before { transform:scaleY(1); }
+.sv-card:hover { background:var(--ink-2); }
+
+.sv-num {
+  font-family:var(--f-display); font-size:64px; font-weight:800; line-height:1;
+  color:rgba(200,117,31,0.06); position:absolute; top:24px; right:28px;
+  pointer-events:none; user-select:none; transition:color 0.35s;
+  letter-spacing:-0.04em;
+}
+.sv-card:hover .sv-num { color:rgba(200,117,31,0.12); }
+
+.sv-icon {
+  width:44px; height:44px; margin-bottom:30px;
+  border:1px solid var(--copper-20);
+  display:grid; place-items:center; font-size:18px;
+  background:var(--copper-10);
+  clip-path:polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+  transition:border-color 0.3s, background 0.3s;
+}
+.sv-card:hover .sv-icon { border-color:var(--copper-40); background:var(--copper-20); }
+
+.sv-name {
+  font-family:var(--f-head); font-size:19px; font-weight:600;
+  color:var(--white); margin-bottom:14px; letter-spacing:-0.01em;
+}
+.sv-desc {
+  font-family:var(--f-body); font-size:14px; line-height:1.82;
+  color:var(--white-60); margin-bottom:28px;
+}
+.sv-spec {
+  font-family:var(--f-mono); font-size:11px; font-weight:700;
+  letter-spacing:0.22em; text-transform:uppercase;
+  color:var(--copper); opacity:0.75;
+  border-top:1px solid var(--white-07); padding-top:16px;
+}
+
+/* ════════════════════════════════════════
+   CASES — Premium data cards
+════════════════════════════════════════ */
+#cases { background:var(--ink); }
+.cases-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:64px; flex-wrap:wrap; gap:24px; }
+.cases-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:3px; }
+
+.case-card {
+  background:var(--ink-1);
+  position:relative; overflow:hidden;
+  transition:transform 0.4s var(--ease-out);
+  border:1px solid var(--white-07);
+}
+.case-card:hover { transform:translateY(-4px); border-color:var(--copper-20); }
+
+.cc-visual {
+  height:210px; position:relative; overflow:hidden;
+  background:var(--ink-2);
+}
+.cc-visual-img {
+  position:absolute; inset:0; background-size:cover; background-position:center;
+  transition:transform 0.7s var(--ease-out); filter:saturate(0.7) brightness(0.6);
+}
+.case-card:hover .cc-visual-img { transform:scale(1.06); }
+.cc-visual::after {
+  content:''; position:absolute; inset:0; z-index:1;
+  background:linear-gradient(0deg, var(--ink-1) 0%, rgba(10,10,10,0.3) 60%, transparent 100%);
+}
+.cc-model {
+  position:absolute; bottom:18px; left:22px; z-index:2;
+}
+.cc-name {
+  font-family:var(--f-display); font-size:24px; font-weight:800;
+  color:var(--white); letter-spacing:-0.02em; line-height:1;
+}
+.cc-sub {
+  font-family:var(--f-mono); font-size:11px; font-weight:600;
+  letter-spacing:0.2em; text-transform:uppercase; color:var(--white-35); margin-top:4px;
+}
+.cc-badge {
+  position:absolute; top:16px; right:16px; z-index:2;
+  background:var(--copper); color:var(--ink);
+  font-family:var(--f-mono); font-size:10px; font-weight:800;
+  letter-spacing:0.18em; text-transform:uppercase; padding:5px 14px;
+  clip-path:polygon(4px 0%,100% 0%,calc(100% - 4px) 100%,0% 100%);
+}
+
+.cc-data { padding:24px 24px 28px; }
+.cc-metrics {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:1px;
+  background:var(--white-07); margin-bottom:20px;
+}
+.cc-m { background:var(--ink-2); padding:16px 14px; }
+.cc-m.aft { background:rgba(255,59,26,0.06); }
+.cc-m-lbl {
+  font-family:var(--f-mono); font-size:9px; font-weight:700;
+  letter-spacing:0.2em; text-transform:uppercase; color:var(--white-35);
+  display:block; margin-bottom:6px;
+}
+.cc-m.aft .cc-m-lbl { color:var(--fire); opacity:0.7; }
+.cc-m-val {
+  font-family:var(--f-display); font-size:26px; font-weight:800;
+  color:var(--white-35); letter-spacing:-0.02em;
+}
+.cc-m.aft .cc-m-val { color:var(--fire); }
+
+.cc-tags { display:flex; flex-wrap:wrap; gap:6px; }
+.cc-tag {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.15em; text-transform:uppercase;
+  border:1px solid rgba(200,117,31,0.22); color:var(--copper);
+  padding:4px 12px; background:var(--copper-10);
+}
+
+/* ════════════════════════════════════════
+   NUMBERS DIVIDER — Full-bleed impact
+════════════════════════════════════════ */
+.numbers-band {
+  background:var(--ink-1);
+  border-top:1px solid var(--copper-20);
+  border-bottom:1px solid var(--copper-20);
+  padding:70px 0; overflow:hidden;
+  position:relative;
+}
+.numbers-band::before {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse 60% 100% at 50% 100%, rgba(200,117,31,0.06) 0%, transparent 70%);
+  pointer-events:none;
+}
+.numbers-inner {
+  display:grid; grid-template-columns:repeat(5,1fr); gap:0; position:relative; z-index:1;
+}
+.n-item {
+  padding:0 40px; text-align:center;
+  border-right:1px solid var(--white-07);
+}
+.n-item:last-child { border-right:none; }
+.n-num {
+  font-family:var(--f-display); font-size:clamp(48px,5.5vw,72px); font-weight:800;
+  color:var(--copper); display:block; line-height:1; margin-bottom:10px;
+  letter-spacing:-0.03em;
+}
+.n-lbl {
+  font-family:var(--f-body); font-size:11px; font-weight:500;
+  letter-spacing:0.1em; text-transform:uppercase; color:var(--white-35);
+}
+
+/* ════════════════════════════════════════
+   PROJECTS LIBRARY — Masonry editorial
+════════════════════════════════════════ */
+#projects { background:var(--ink-1); }
+.proj-header { margin-bottom:48px; }
+.proj-filters { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:40px; }
+.pf-btn {
+  font-family:var(--f-mono); font-weight:700; font-size:11px;
+  letter-spacing:0.18em; text-transform:uppercase;
+  background:transparent; border:1px solid var(--white-07);
+  color:var(--white-35); padding:9px 20px; cursor:pointer;
+  transition:all 0.2s;
+}
+.pf-btn.on,.pf-btn:hover {
+  border-color:var(--copper-40); color:var(--copper); background:var(--copper-10);
+}
+
+.proj-grid {
+  display:grid;
+  grid-template-columns:repeat(12,1fr);
+  grid-auto-rows:220px;
+  gap:3px;
+}
+.pj { grid-column:span 4; position:relative; overflow:hidden; cursor:pointer; background:var(--ink-2); }
+.pj:nth-child(1) { grid-column:span 5; grid-row:span 2; }
+.pj:nth-child(2) { grid-column:span 7; }
+.pj:nth-child(3) { grid-column:span 3; }
+.pj:nth-child(4) { grid-column:span 4; }
+.pj:nth-child(5) { grid-column:span 3; grid-row:span 2; }
+.pj:nth-child(6) { grid-column:span 5; }
+.pj:nth-child(7) { grid-column:span 4; }
+.pj:nth-child(8) { grid-column:span 6; }
+.pj:nth-child(9) { grid-column:span 6; }
+.pj:nth-child(10){ grid-column:span 12; }
+
+.pj-bg {
+  position:absolute; inset:0;
+  background-size:cover; background-position:center;
+  transition:transform 0.7s var(--ease-out), filter 0.4s;
+  filter:saturate(0.5) brightness(0.5);
+}
+.pj:hover .pj-bg { transform:scale(1.08); filter:saturate(0.7) brightness(0.6); }
+
+.pj-overlay {
+  position:absolute; inset:0;
+  background:linear-gradient(0deg, rgba(4,4,4,0.92) 0%, rgba(4,4,4,0.2) 50%, transparent 100%);
+}
+
+.pj::before {
+  content:''; position:absolute; inset:0; z-index:2;
+  background:radial-gradient(ellipse at 0% 100%, rgba(200,117,31,0.18) 0%, transparent 60%);
+  opacity:0; transition:opacity 0.5s;
+}
+.pj:hover::before { opacity:1; }
+
+.pj-info {
+  position:absolute; bottom:0; left:0; right:0; z-index:3;
+  padding:22px 24px;
+}
+.pj-cat {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.22em; text-transform:uppercase; color:var(--copper);
+  display:block; margin-bottom:6px;
+}
+.pj-name {
+  font-family:var(--f-display); font-size:18px; font-weight:800;
+  color:var(--white); letter-spacing:-0.02em; margin-bottom:4px;
+}
+.pj-gains { font-family:var(--f-body); font-size:13px; color:var(--white-60); }
+.pj-gains strong { color:var(--fire); font-weight:600; }
+
+.pj-reveal {
+  position:absolute; inset:0; z-index:4;
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; transition:all 0.3s;
+}
+.pj:hover .pj-reveal { opacity:1; }
+.pj-reveal-inner {
+  font-family:var(--f-mono); font-size:11px; font-weight:700;
+  letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--copper); border:1px solid var(--copper);
+  padding:10px 22px; background:rgba(4,4,4,0.85);
+  backdrop-filter:blur(8px);
+}
+.pj:hover .pj-reveal { opacity:1; }
+.pj-reveal-inner {
+  font-family:var(--f-mono); font-size:11px; font-weight:700;
+  letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--copper); border:1px solid var(--copper);
+  padding:10px 22px; background:rgba(5,5,5,0.85);
+}
+
+/* ════════════════════════════════════════
+   CONCIERGE IA SECTION
+════════════════════════════════════════ */
+#concierge { background:var(--ink); }
+.conc-layout { display:grid; grid-template-columns:1fr 1fr; gap:100px; align-items:center; }
+.conc-features { display:flex; flex-direction:column; gap:0; }
+.conc-feat {
+  display:flex; gap:22px; padding:28px 0;
+  border-bottom:1px solid var(--white-07);
+  transition:padding 0.3s;
+}
+.conc-feat:hover { padding-left:8px; }
+.cf-num {
+  font-family:var(--f-display); font-size:34px; font-weight:800;
+  color:rgba(200,117,31,0.2);
+  flex-shrink:0; width:40px; padding-top:2px; line-height:1;
+  transition:color 0.3s; letter-spacing:-0.04em;
+}
+.conc-feat:hover .cf-num { color:var(--copper); }
+.cf-title {
+  font-family:var(--f-head); font-size:16px; font-weight:600;
+  color:var(--white); margin-bottom:8px; letter-spacing:-0.01em;
+}
+.cf-body { font-family:var(--f-body); font-size:14px; line-height:1.75; color:var(--white-60); }
+
+/* ════════════════════════════════════════
+   CTA FINAL
+════════════════════════════════════════ */
+#cta-final {
+  background:var(--ink);
+  padding:160px 0; text-align:center;
+  position:relative; overflow:hidden;
+}
+.cta-bg-text {
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  font-family:var(--f-display); font-size:clamp(90px,14vw,180px); font-weight:800;
+  white-space:nowrap; pointer-events:none; user-select:none;
+  color:transparent; -webkit-text-stroke:1px rgba(200,117,31,0.05);
+  letter-spacing:-0.02em;
+}
+.cta-glow {
+  position:absolute; top:50%; left:50%;
+  width:900px; height:500px;
+  background:radial-gradient(ellipse,rgba(200,117,31,0.08) 0%, transparent 65%);
+  transform:translate(-50%,-50%); pointer-events:none;
+}
+.cta-title {
+  font-family:var(--f-display); font-size:clamp(42px,6vw,80px); font-weight:800;
+  line-height:0.95; letter-spacing:-0.04em; color:var(--white);
+  margin-bottom:24px; position:relative; z-index:1;
+}
+.cta-title em { font-style:normal; color:var(--copper); display:block; }
+.cta-sub {
+  font-family:var(--f-body); font-size:17px; color:var(--white-60); line-height:1.75;
+  max-width:460px; margin:0 auto 56px; position:relative; z-index:1;
+}
+.cta-actions { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; position:relative; z-index:1; }
+.btn-wa {
+  display:inline-flex; align-items:center; gap:10px;
+  background:#22C55E; color:#fff; border:none; cursor:pointer;
+  font-family:var(--f-mono); font-weight:800;
+  font-size:12px; letter-spacing:0.18em; text-transform:uppercase;
+  padding:16px 34px; text-decoration:none;
+  transition:all 0.25s;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+}
+.btn-wa:hover { background:#16A34A; box-shadow:0 0 36px rgba(34,197,94,0.35); }
+
+/* Particles */
+#pCanvas { position:absolute; inset:0; pointer-events:none; }
+
+/* ════════════════════════════════════════
+   FOOTER
+════════════════════════════════════════ */
+footer {
+  background:var(--ink-1);
+  border-top:1px solid var(--copper-20);
+  padding:80px 0 40px;
+}
+.ft-grid { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:60px; margin-bottom:60px; }
+.ft-logo {
+  font-family:var(--f-display); font-size:18px; font-weight:800;
+  letter-spacing:0.1em; color:var(--white); margin-bottom:18px;
+}
+.ft-about { font-family:var(--f-body); font-size:13px; line-height:1.85; color:var(--white-35); margin-bottom:28px; max-width:280px; }
+.ft-socials { display:flex; gap:8px; }
+.ft-soc {
+  width:36px; height:36px; border:1px solid var(--white-07);
+  display:grid; place-items:center; color:var(--white-35);
+  font-family:var(--f-mono); font-size:11px; text-decoration:none; font-weight:700;
+  transition:all 0.2s;
+}
+.ft-soc:hover { border-color:var(--copper); color:var(--copper); background:var(--copper-10); }
+.ft-col-head {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.3em; text-transform:uppercase; color:var(--copper);
+  margin-bottom:22px; opacity:0.75;
+}
+.ft-links { list-style:none; display:flex; flex-direction:column; gap:12px; }
+.ft-links a {
+  font-family:var(--f-body); font-size:13px; color:var(--white-35); text-decoration:none;
+  font-weight:400; transition:color 0.2s;
+  display:flex; align-items:center; gap:8px;
+}
+.ft-links a:hover { color:var(--copper); }
+.ft-bottom {
+  border-top:1px solid var(--white-07); padding-top:30px;
+  display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;
+}
+.ft-copy {
+  font-family:var(--f-mono); font-size:11px; font-weight:600;
+  letter-spacing:0.1em; text-transform:uppercase; color:rgba(240,237,232,0.15);
+}
+
+/* ════════════════════════════════════════
+   FLOATING CONCIERGE
+════════════════════════════════════════ */
+.fc-wrap {
+  position:fixed; bottom:36px; right:36px; z-index:1000;
+  display:flex; flex-direction:column; align-items:flex-end; gap:14px;
+}
+.fc-tip {
+  background:var(--ink-2); border:1px solid var(--copper-40);
+  padding:12px 18px; max-width:230px;
+  box-shadow:0 0 30px rgba(200,117,31,0.12);
+  opacity:0; transform:translateY(8px) scale(0.96);
+  transition:all 0.5s var(--ease-out); pointer-events:none;
+  position:relative;
+}
+.fc-tip::after {
+  content:''; position:absolute; bottom:-6px; right:24px;
+  width:10px; height:10px; background:var(--ink-2);
+  border-right:1px solid var(--copper-40);
+  border-bottom:1px solid var(--copper-40);
+  transform:rotate(45deg);
+}
+.fc-tip.show { opacity:1; transform:translateY(0) scale(1); pointer-events:auto; }
+.fc-tip-strong { display:block; font-weight:700; font-size:13px; color:var(--copper); margin-bottom:3px; }
+.fc-tip-body { font-size:12px; color:var(--white-60); line-height:1.5; }
+
+.fc-btn {
+  width:58px; height:58px;
+  background:linear-gradient(135deg,var(--copper),var(--copper-lt));
+  border:none; cursor:pointer;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  display:grid; place-items:center; font-size:22px;
+  box-shadow:0 0 0 0 rgba(200,117,31,0.4);
+  animation:fcPulse 2.8s ease-in-out infinite;
+  transition:transform 0.2s;
+}
+.fc-btn:hover { transform:scale(1.1); }
+@keyframes fcPulse {
+  0%,100%{ box-shadow:0 0 0 0 rgba(200,117,31,0.4),0 8px 32px rgba(200,117,31,0.3); }
+  50%    { box-shadow:0 0 0 12px rgba(200,117,31,0),0 8px 40px rgba(200,117,31,0.4); }
+}
+
+/* ════════════════════════════════════════
+   CONCIERGE PANEL
+════════════════════════════════════════ */
+.cp-overlay {
+  position:fixed; inset:0; z-index:1500;
+  pointer-events:none;
+}
+.cp-panel {
+  position:absolute; bottom:108px; right:36px;
+  width:400px; max-height:80vh;
+  background:var(--ink-2); border:1px solid rgba(200,117,31,0.25);
+  box-shadow:0 40px 100px rgba(0,0,0,0.8), 0 0 60px rgba(200,117,31,0.1);
+  display:flex; flex-direction:column;
+  opacity:0; transform:translateY(16px) scale(0.97);
+  transition:all 0.45s var(--ease-out); pointer-events:none;
+}
+.cp-panel.open { opacity:1; transform:translateY(0) scale(1); pointer-events:all; }
+
+.cp-head {
+  padding:18px 22px;
+  background:linear-gradient(135deg,rgba(200,117,31,0.1),transparent);
+  border-bottom:1px solid rgba(200,117,31,0.15);
+  display:flex; align-items:center; gap:12px;
+}
+.cp-head-icon {
+  width:38px; height:38px; flex-shrink:0;
+  background:linear-gradient(135deg,var(--copper),var(--copper-lt));
+  clip-path:polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+  display:grid; place-items:center; font-size:16px; color:var(--ink);
+}
+.cp-head-title { font-family:var(--f-head); font-size:14px; font-weight:700; color:var(--white); letter-spacing:-0.01em; }
+.cp-head-sub { font-family:var(--f-mono); font-size:10px; font-weight:600; letter-spacing:0.15em; color:var(--white-35); margin-top:2px; }
+.cp-close { background:none; border:none; cursor:pointer; color:var(--white-35); font-size:16px; margin-left:auto; padding:4px; transition:color 0.2s; }
+.cp-close:hover { color:var(--copper); }
+
+.cp-scroll { flex:1; overflow-y:auto; padding:20px 22px; display:flex; flex-direction:column; gap:14px; }
+.cp-scroll::-webkit-scrollbar { width:2px; }
+.cp-scroll::-webkit-scrollbar-thumb { background:var(--copper); }
+
+.cp-section-head {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.25em; text-transform:uppercase; color:var(--copper); opacity:0.75;
+}
+.cp-inputs { display:flex; flex-direction:column; gap:8px; }
+.cp-inp {
+  background:var(--ink-3); border:1px solid rgba(255,255,255,0.06);
+  color:var(--white); font-family:var(--f-head); font-size:13px; font-weight:500;
+  padding:11px 14px; outline:none; transition:border-color 0.2s; width:100%;
+}
+.cp-inp:focus { border-color:var(--copper-40); }
+.cp-inp::placeholder { color:var(--white-35); font-weight:400; }
+.cp-opts { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.cp-opt {
+  background:var(--ink-3); border:1px solid rgba(255,255,255,0.06);
+  color:var(--white-35); font-family:var(--f-mono); font-size:11px; font-weight:700;
+  letter-spacing:0.08em; text-transform:uppercase; padding:11px;
+  cursor:pointer; transition:all 0.2s; text-align:center;
+}
+.cp-opt.on,.cp-opt:hover { background:var(--copper-10); border-color:var(--copper-40); color:var(--copper); }
+.cp-run {
+  width:100%; padding:14px;
+  background:var(--copper); color:var(--ink); border:none; cursor:pointer;
+  font-family:var(--f-mono); font-weight:800; font-size:12px;
+  letter-spacing:0.2em; text-transform:uppercase;
+  clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+  transition:all 0.25s;
+}
+.cp-run:hover { background:var(--copper-lt); box-shadow:0 0 24px var(--copper-40); }
+.cp-run:disabled { opacity:0.5; cursor:not-allowed; }
+
+.cp-result-box { display:none; flex-direction:column; gap:10px; }
+.cp-result-box.on { display:flex; }
+.cp-res-head {
+  background:var(--copper-10); border:1px solid var(--copper-20);
+  padding:14px 16px; font-size:13px; line-height:1.6; color:var(--white);
+}
+.cp-res-head strong { color:var(--copper); }
+.cp-metrics-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:rgba(255,255,255,0.04); }
+.cp-met { background:var(--ink-3); padding:12px 8px; text-align:center; }
+.cp-met-val { font-family:var(--f-display); font-size:22px; color:var(--copper-lt); display:block; }
+.cp-met-lbl { font-family:var(--f-mono); font-size:9px; font-weight:700; letter-spacing:0.15em; text-transform:uppercase; color:var(--white-35); }
+.cp-bens { display:flex; flex-direction:column; gap:5px; }
+.cp-ben { font-size:12px; color:var(--white-60); display:flex; align-items:center; gap:8px; }
+.cp-ben::before { content:'▸'; color:var(--copper); flex-shrink:0; font-size:10px; }
+.cp-wa {
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  background:#25D366; color:#fff; border:none; cursor:pointer;
+  font-family:var(--f-mono); font-weight:800; font-size:11px;
+  letter-spacing:0.15em; text-transform:uppercase; padding:13px;
+  text-decoration:none; transition:all 0.2s;
+}
+.cp-wa:hover { background:#1db554; }
+
+/* ════════════════════════════════════════
+   REPROGRAMACIONES — UNICHIP
+════════════════════════════════════════ */
+#repro { background:var(--ink); }
+
+.repro-intro {
+  text-align:center;
+  max-width:680px; margin:0 auto 72px;
+}
+.repro-intro .h2 { margin:16px 0 20px; }
+.repro-intro p {
+  font-size:15px; line-height:1.8; color:var(--white-60);
+}
+
+/* ── UNICHIP HERO BLOCK ── */
+.unichip-block {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:0; border:1px solid rgba(200,117,31,0.15);
+  margin-bottom:64px; overflow:hidden;
+}
+.unichip-img {
+  position:relative; overflow:hidden; min-height:420px;
+}
+.unichip-img img {
+  width:100%; height:100%; object-fit:cover;
+  object-position:center top;
+  filter:saturate(0.8) contrast(1.05);
+  transition:transform 0.8s var(--ease-out);
+}
+.unichip-block:hover .unichip-img img { transform:scale(1.04); }
+.unichip-img::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent 60%, var(--ink) 100%);
+}
+.unichip-body {
+  padding:52px 48px;
+  background:var(--ink-1);
+  display:flex; flex-direction:column; justify-content:center;
+  border-left:1px solid rgba(200,117,31,0.12);
+}
+.unichip-tag {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.3em; text-transform:uppercase;
+  color:var(--copper); margin-bottom:16px;
+}
+.unichip-title {
+  font-family:var(--f-display); font-size:clamp(28px,3vw,42px);
+  font-weight:800; line-height:1.05; letter-spacing:-0.03em;
+  color:var(--white); margin-bottom:20px;
+}
+.unichip-title span { color:var(--copper); }
+.unichip-desc {
+  font-size:14px; line-height:1.85; color:var(--white-60);
+  margin-bottom:32px;
+}
+.unichip-chips {
+  display:flex; flex-wrap:wrap; gap:8px;
+}
+.uc-chip {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--copper); padding:6px 14px;
+  border:1px solid var(--copper-40);
+  background:var(--copper-10);
+}
+
+/* ── VENTAJAS GRID ── */
+.repro-ventajas {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:1px; background:rgba(255,255,255,0.05);
+  margin-bottom:64px;
+}
+.rv-card {
+  background:var(--ink-1);
+  padding:36px 28px;
+  position:relative; overflow:hidden;
+  transition:background 0.3s;
+}
+.rv-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, var(--copper), transparent);
+  transform:scaleX(0); transform-origin:left;
+  transition:transform 0.4s var(--ease-out);
+}
+.rv-card:hover { background:var(--ink-2); }
+.rv-card:hover::before { transform:scaleX(1); }
+.rv-icon {
+  font-size:28px; margin-bottom:16px; display:block;
+}
+.rv-title {
+  font-family:var(--f-head); font-size:15px; font-weight:700;
+  color:var(--copper); margin-bottom:10px; letter-spacing:-0.01em;
+}
+.rv-body {
+  font-size:13px; line-height:1.75; color:var(--white-60);
+}
+
+/* ── MAPAS GRID ── */
+.repro-mapas-head {
+  margin-bottom:32px;
+}
+.mapas-grid {
+  display:grid; grid-template-columns:repeat(5,1fr);
+  gap:1px; background:rgba(255,255,255,0.05);
+  margin-bottom:64px;
+}
+.mapa-card {
+  background:var(--ink-1); padding:28px 20px;
+  position:relative; overflow:hidden;
+  transition:background 0.25s;
+}
+.mapa-card:hover { background:var(--ink-2); }
+.mapa-num {
+  font-family:var(--f-display); font-size:36px; font-weight:800;
+  color:var(--copper-10); line-height:1; margin-bottom:12px;
+  -webkit-text-stroke:1px var(--copper-40);
+}
+.mapa-name {
+  font-family:var(--f-head); font-size:13px; font-weight:700;
+  color:var(--white); margin-bottom:8px;
+}
+.mapa-desc {
+  font-size:11px; line-height:1.65; color:var(--white-35);
+}
+
+/* ── RESULTADOS BANNER ── */
+.repro-resultado {
+  display:grid; grid-template-columns:1fr 1fr;
+  gap:0; border:1px solid rgba(200,117,31,0.15);
+  overflow:hidden;
+}
+.rr-img {
+  position:relative; overflow:hidden; min-height:380px;
+}
+.rr-img img {
+  width:100%; height:100%; object-fit:cover;
+  filter:saturate(0.75) contrast(1.1);
+  transition:transform 0.8s var(--ease-out);
+}
+.repro-resultado:hover .rr-img img { transform:scale(1.04); }
+.rr-img::after {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent 50%, var(--ink) 100%);
+}
+.rr-body {
+  background:var(--ink-1); padding:52px 44px;
+  display:flex; flex-direction:column; justify-content:center;
+  border-left:1px solid rgba(200,117,31,0.12);
+}
+.rr-tag {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.3em; text-transform:uppercase;
+  color:var(--copper); margin-bottom:16px;
+}
+.rr-title {
+  font-family:var(--f-display); font-size:clamp(24px,2.5vw,36px);
+  font-weight:800; color:var(--white); line-height:1.1;
+  margin-bottom:28px; letter-spacing:-0.02em;
+}
+.rr-results {
+  display:grid; grid-template-columns:1fr 1fr; gap:16px;
+  margin-bottom:28px;
+}
+.rr-result {
+  background:var(--ink-2); padding:18px 16px;
+  border:1px solid rgba(255,255,255,0.06);
+  border-top:2px solid var(--copper);
+}
+.rr-result-type {
+  font-family:var(--f-mono); font-size:9px; font-weight:700;
+  letter-spacing:0.2em; text-transform:uppercase; color:var(--white-35);
+  margin-bottom:8px;
+}
+.rr-result-before {
+  font-family:var(--f-body); font-size:12px; color:var(--white-35);
+  margin-bottom:4px;
+}
+.rr-result-after {
+  font-family:var(--f-display); font-size:22px; font-weight:800;
+  color:var(--copper); letter-spacing:-0.02em;
+}
+.rr-note {
+  font-size:12px; color:var(--white-35); line-height:1.6;
+  font-style:italic;
+}
+
+/* Repro responsive */
+@media(max-width:1100px){
+  .unichip-block,.repro-resultado { grid-template-columns:1fr; }
+  .unichip-img,.rr-img { min-height:240px; }
+  .unichip-img::after,.rr-img::after { background:linear-gradient(180deg, transparent 50%, var(--ink) 100%); }
+  .repro-ventajas { grid-template-columns:1fr 1fr; }
+  .mapas-grid { grid-template-columns:repeat(3,1fr); }
+}
+@media(max-width:768px){
+  .repro-ventajas { grid-template-columns:1fr; }
+  .mapas-grid { grid-template-columns:1fr 1fr; }
+  .rr-results { grid-template-columns:1fr; }
+  .unichip-body,.rr-body { padding:32px 24px; }
+}
+
+/* ════════════════════════════════════════
+   NOSOTROS
+════════════════════════════════════════ */
+#nosotros { background:var(--ink-1); }
+.nos-wrap {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:80px;
+  align-items:start;
+}
+.nos-left { position:relative; }
+.nos-img-frame {
+  position:relative;
+  width:100%;
+  aspect-ratio:3/4;
+  overflow:hidden;
+  clip-path:polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
+}
+.nos-img-frame img {
+  width:100%; height:100%;
+  object-fit:cover;
+  filter:saturate(0.7) contrast(1.1);
+  transition:transform 0.8s var(--ease-out);
+}
+.nos-img-frame:hover img { transform:scale(1.04); }
+.nos-img-overlay {
+  position:absolute; inset:0;
+  background:linear-gradient(180deg, transparent 50%, rgba(4,4,4,0.7) 100%);
+}
+.nos-accent-line {
+  position:absolute; top:28px; left:-3px;
+  width:3px; height:60px;
+  background:linear-gradient(180deg, var(--copper), transparent);
+}
+.nos-right { padding-top:8px; }
+.nos-lead {
+  font-size:17px; line-height:1.85;
+  color:var(--white-60);
+  margin:28px 0 36px;
+}
+.nos-lead strong { color:var(--white); font-weight:600; }
+.nos-pillars {
+  display:flex; flex-direction:column; gap:0;
+  border:1px solid rgba(255,255,255,0.06);
+  margin-bottom:40px;
+}
+.nos-pillar {
+  padding:18px 22px;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  display:flex; align-items:flex-start; gap:16px;
+}
+.nos-pillar:last-child { border-bottom:none; }
+.nos-p-num {
+  font-family:var(--f-mono); font-size:11px; font-weight:700;
+  letter-spacing:0.15em; color:var(--copper); opacity:0.7;
+  flex-shrink:0; padding-top:2px;
+}
+.nos-p-title {
+  font-family:var(--f-head); font-size:14px; font-weight:700;
+  color:var(--white); margin-bottom:4px;
+}
+.nos-p-body {
+  font-size:13px; line-height:1.65; color:var(--white-60);
+}
+.nos-founder {
+  background:var(--ink-2);
+  border:1px solid rgba(200,117,31,0.15);
+  border-left:3px solid var(--copper);
+  padding:22px 24px;
+}
+.nos-founder-tag {
+  font-family:var(--f-mono); font-size:10px; font-weight:700;
+  letter-spacing:0.25em; text-transform:uppercase;
+  color:var(--copper); margin-bottom:12px;
+}
+.nos-founder-text {
+  font-size:13px; line-height:1.75; color:var(--white-60);
+  font-style:italic;
+}
+.nos-stats {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  margin-top:20px;
+  border-top:1px solid rgba(255,255,255,0.07);
+}
+.nos-stat {
+  padding:20px 16px;
+  border-right:1px solid rgba(255,255,255,0.07);
+  text-align:left;
+}
+.nos-stat:last-child { border-right:none; }
+.nos-stat-val {
+  font-family:var(--f-display); font-size:28px; font-weight:800;
+  color:var(--copper); display:block; line-height:1;
+  margin-bottom:5px; letter-spacing:-0.02em;
+}
+.nos-stat-lbl {
+  font-family:var(--f-mono); font-size:9px; font-weight:700;
+  letter-spacing:0.15em; text-transform:uppercase; color:var(--white-35);
+  line-height:1.3;
+}
+@media(max-width:1100px){
+  .nos-wrap { grid-template-columns:1fr; gap:48px; }
+  .nos-img-frame { aspect-ratio:16/9; }
+}
+@media(max-width:768px){
+  .nos-stats { grid-template-columns:1fr 1fr; }
+}
+
+/* ════════════════════════════════════════
+   SCROLL ANIMATIONS
+════════════════════════════════════════ */
+.reveal { opacity:0; transform:translateY(24px); transition:opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out); }
+.reveal.in { opacity:1; transform:translateY(0); }
+.reveal.d1 { transition-delay:0.08s; }
+.reveal.d2 { transition-delay:0.16s; }
+.reveal.d3 { transition-delay:0.24s; }
+.reveal.d4 { transition-delay:0.32s; }
+
+/* ════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════ */
+@media (max-width:1100px) {
+  .conc-layout { grid-template-columns:1fr; gap:52px; }
+  .sv-grid { grid-template-columns:repeat(2,1fr); }
+  .ft-grid { grid-template-columns:1fr 1fr; }
+  .numbers-inner { grid-template-columns:repeat(3,1fr); }
+}
+
+/* ── HAMBURGER MENU ── */
+.mob-menu-btn {
+  display:none;
+  background:none; border:none; cursor:pointer;
+  padding:8px; margin-left:auto;
+  flex-direction:column; gap:5px;
+}
+.mob-menu-btn span {
+  display:block; width:24px; height:2px;
+  background:var(--white); border-radius:0;
+  transition:all 0.3s var(--ease-out);
+}
+.mob-menu-btn.open span:nth-child(1) { transform:translateY(7px) rotate(45deg); }
+.mob-menu-btn.open span:nth-child(2) { opacity:0; transform:translateX(-8px); }
+.mob-menu-btn.open span:nth-child(3) { transform:translateY(-7px) rotate(-45deg); }
+
+/* Mobile full-screen nav overlay */
+.mob-nav {
+  display:none;
+  position:fixed; inset:0; z-index:790;
+  background:rgba(4,4,4,0.97);
+  backdrop-filter:blur(20px);
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:0; opacity:0; pointer-events:none;
+  transition:opacity 0.35s var(--ease-out);
+}
+.mob-nav.open { opacity:1; pointer-events:all; }
+.mob-nav a {
+  font-family:var(--f-display); font-size:clamp(28px,8vw,40px);
+  font-weight:800; letter-spacing:-0.01em;
+  color:var(--white-60); text-decoration:none;
+  padding:16px 0; width:100%; text-align:center;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+  transition:color 0.2s;
+}
+.mob-nav a:hover { color:var(--copper); }
+.mob-nav .mob-cta {
+  margin-top:32px;
+  font-family:var(--f-mono); font-size:13px; font-weight:800;
+  letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--ink); background:var(--copper);
+  padding:16px 40px;
+  clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);
+  border:none;
+}
+
+@media (max-width:768px) {
+  /* ── NAV ── */
+  nav { padding:0 20px; height:64px; }
+  .nav-links,.nav-action { display:none; }
+  .mob-menu-btn { display:flex; }
+  .mob-nav { display:flex; }
+  .nav-logo img { height:44px; }
+
+  /* ── WRAP & SECTIONS ── */
+  .wrap { padding:0 20px; }
+  section.pad { padding:64px 0; }
+
+  /* ── HERO ── */
+  .hero-content {
+    padding:0 20px;
+    padding-top:80px;
+    max-width:100%;
+    text-align:center;
+  }
+  .hero-title {
+    font-size:clamp(42px,12vw,64px);
+    letter-spacing:-0.03em;
+  }
+  .hero-body { font-size:14px; max-width:100%; margin-bottom:36px; }
+  .hero-ctas { justify-content:center; flex-direction:column; align-items:center; gap:12px; }
+  .hero-ctas .btn-copper,
+  .hero-ctas .btn-ghost { width:100%; max-width:300px; justify-content:center; }
+  .hero-tag { justify-content:center; }
+  .hero-visual,.hero-slash,.hero-scanline { display:none; }
+  .hero-data {
+    position:relative; left:auto; right:auto; bottom:auto;
+    display:grid; grid-template-columns:repeat(3,1fr);
+    border-top:1px solid var(--white-07);
+    margin-top:40px;
+  }
+  .hd-item { padding:16px 12px; text-align:center; border-right:1px solid var(--white-07); }
+  .hd-item:last-child { border-right:none; }
+  .hd-val { font-size:28px; }
+  .hd-lbl { font-size:9px; }
+
+  /* ── SERVICES ── */
+  .sv-grid { grid-template-columns:1fr; }
+  .sv-header { flex-direction:column; align-items:flex-start; }
+  .sv-card { border-right:none; padding:24px 20px; }
+
+
+  /* ── NUMBERS ── */
+  .numbers-inner { grid-template-columns:repeat(2,1fr); }
+  .n-num { font-size:clamp(36px,10vw,52px); }
+
+  /* ── NOSOTROS ── */
+  .nos-wrap { grid-template-columns:1fr; gap:40px; }
+  .nos-img-frame { aspect-ratio:16/9; }
+  .nos-stats { grid-template-columns:repeat(3,1fr); }
+  .nos-stat-val { font-size:22px; }
+  .nos-lead { font-size:15px; }
+
+  /* ── PROJECTS ── */
+  .proj-grid { grid-template-columns:1fr; grid-auto-rows:220px; }
+  .pj { grid-column:span 1 !important; }
+  .proj-filters { gap:8px; flex-wrap:wrap; }
+  .pf-btn { font-size:10px; padding:8px 14px; }
+
+  /* ── CONCIERGE ── */
+  .conc-layout { grid-template-columns:1fr; gap:40px; }
+  .conc-features { gap:20px; }
+
+  /* ── CONCIERGE PANEL ── */
+  .cp-panel { right:20px; width:calc(100vw - 40px); bottom:96px; }
+  .cp-metrics-grid { grid-template-columns:repeat(2,1fr); }
+  .mapas-grid { grid-template-columns:repeat(2,1fr); }
+  .unichip-body { padding:32px 24px; }
+  .repro-resultado { grid-template-columns:1fr; }
+
+  /* ── CTA FINAL ── */
+  .cta-title { font-size:clamp(36px,10vw,52px); }
+  .cta-actions { flex-direction:column; align-items:center; gap:12px; }
+  .cta-actions .btn-copper,
+  .cta-actions .btn-wa { width:100%; max-width:300px; justify-content:center; text-align:center; }
+  .cta-bg-text { font-size:clamp(60px,20vw,120px); }
+
+  /* ── FOOTER ── */
+  .ft-grid { grid-template-columns:1fr; gap:36px; }
+  .cases-grid { grid-template-columns:1fr; }
+}
+
+@media (max-width:400px) {
+  .hero-title { font-size:38px; }
+  .nos-stats { grid-template-columns:1fr 1fr; }
+  .numbers-inner { grid-template-columns:1fr 1fr; }
+  .mapas-grid { grid-template-columns:1fr; }
+  .cp-metrics-grid { grid-template-columns:repeat(2,1fr); }
+  .cp-opts { grid-template-columns:1fr; }
+  .mob-nav .mob-cta { padding:14px 28px; font-size:12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Page load bar -->
+<div id="pgBar" style="position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--copper),var(--fire));z-index:9999;width:0;transition:width 0.4s var(--ease-out),opacity 0.3s"></div>
+
+<!-- Custom cursor (desktop only) -->
+<div class="cursor" id="cur"></div>
+<div class="cursor-ring" id="curR"></div>
+
+<!-- ══ MOBILE NAV OVERLAY ══ -->
+<div class="mob-nav" id="mobNav">
+  <a href="#" onclick="openReproModal();closeMobNav();return false;">Reprogramaciones</a>
+  <a href="#cases" onclick="closeMobNav()">Proyectos</a>
+  <a href="#nosotros" onclick="closeMobNav()">Nosotros</a>
+  <a href="#concierge" onclick="closeMobNav()">Concierge</a>
+  <a href="#contact" onclick="closeMobNav()">Contacto</a>
+  <a href="https://wa.me/584142521941?text=Hola+Kartec%2C+quiero+una+evaluaci%C3%B3n+t%C3%A9cnica." class="mob-cta" target="_blank" onclick="closeMobNav()">⚡ Evaluación Técnica</a>
+</div>
+
+<!-- ══ NAV ══ -->
+<nav id="nav">
+<a href="#" class="nav-logo"><img src="https://res.cloudinary.com/dpiavcukm/image/upload/v1781216203/IMG_7597_sxgbbj_g01dwh.png" alt="Kartec Tuning"></a>
+  <ul class="nav-links">
+    <li><a href="#" onclick="openReproModal();return false;">Reprogramaciones</a></li>
+    <li><a href="#cases">Proyectos</a></li>
+    <li><a href="#nosotros">Nosotros</a></li>
+    <li><a href="#concierge">Concierge</a></li>
+    <li><a href="#contact">Contacto</a></li>
+  </ul>
+  <a href="https://wa.me/584142521941?text=Hola+Kartec%2C+quiero+una+evaluaci%C3%B3n+t%C3%A9cnica." target="_blank" class="nav-action">
+    ⚡ Evaluación Técnica
+  </a>
+  <button class="mob-menu-btn" id="mobBtn" onclick="toggleMobNav()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+
+<!-- ══ HERO ══ -->
+<section id="hero">
+  <!-- ── VIDEO BACKGROUND ── -->
+  <div class="hero-video-bg">
+    <video
+      autoplay muted loop playsinline
+      preload="auto"
+
+    >
+      <source src="https://res.cloudinary.com/dpiavcukm/video/upload/v1781214816/insta_video_22742_ndrzkc.mov" type="video/mp4">
+    </video>
+  </div>
+
+  <div class="hero-visual">
+    <div class="hero-visual-img"></div>
+  </div>
+  <div class="hero-scanline"></div>
+
+
+  <div class="hero-content">
+    <div class="hero-tag">
+      <div class="hero-tag-line"></div>
+      <span class="hero-tag-text">Performance Engineering · Caracas, Venezuela</span>
+    </div>
+    <h1 class="hero-title">
+      Libera el<br>
+      <span>Verdadero</span><br>
+      Potencial
+    </h1>
+    <p class="hero-body">
+      Somos expertos en chips <strong style="color:var(--copper)">UNICHIP</strong> — la tecnología de reprogramación más avanzada del mundo, instalada directamente entre la ECU y los sensores de tu motor para liberar potencia real sin tocar la computadora original de fábrica.
+    </p>
+    <div class="hero-ctas">
+      <button class="btn-copper" onclick="openCP()">⚡ Solicitar Evaluación</button>
+      <button class="btn-ghost" onclick="document.getElementById('cases').scrollIntoView({behavior:'smooth'})">Ver Proyectos →</button>
+    </div>
+  </div>
+
+  <div class="hero-data">
+    <div class="hd-item">
+      <span class="hd-val" data-cnt="850" data-s="">0</span>
+      <span class="hd-lbl">Vehículos optimizados</span>
+    </div>
+    <div class="hd-item">
+      <span class="hd-val" data-cnt="12" data-s="">0</span>
+      <span class="hd-lbl">Años de experiencia</span>
+    </div>
+    <div class="hd-item">
+      <span class="hd-val" data-cnt="68" data-s="%">0</span>
+      <span class="hd-lbl">Ganancia máx. HP</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ TICKER ══ -->
+<div class="ticker">
+  <div class="ticker-track">
+    <span>Reprogramación ECU</span><span class="k">///</span>
+    <span>Dyno Testing</span><span class="k">///</span>
+    <span>Stage 1 · Stage 2 · Stage 3</span><span class="k">///</span>
+    <span>Common Rail Diésel</span><span class="k">///</span>
+    <span>La Casa del UNICHIP</span><span class="k">///</span>
+    <span>+123K Seguidores</span><span class="k">///</span>
+    <span>Caracas · Miranda · Venezuela</span><span class="k">///</span>
+    <span>Reprogramación ECU</span><span class="k">///</span>
+    <span>Dyno Testing</span><span class="k">///</span>
+    <span>Stage 1 · Stage 2 · Stage 3</span><span class="k">///</span>
+    <span>Common Rail Diésel</span><span class="k">///</span>
+    <span>La Casa del UNICHIP</span><span class="k">///</span>
+    <span>+123K Seguidores</span><span class="k">///</span>
+    <span>Caracas · Miranda · Venezuela</span><span class="k">///</span>
+  </div>
+</div>
+
+<!-- ══ NOSOTROS ══ -->
+<section id="nosotros" class="pad" style="position:relative; background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_1800,q_60,f_auto/IMG_7593_mc1wud'); background-size:cover; background-position:center; background-attachment:fixed;">
+  <div style="position:absolute;inset:0;background:rgba(4,4,4,0.88);z-index:0;"></div>
+  <div class="wrap" style="position:relative;z-index:1;">
+    <div class="nos-wrap">
+
+      <!-- LEFT — imagen -->
+      <div class="nos-left reveal">
+        <div class="nos-accent-line"></div>
+        <div class="nos-img-frame">
+          <img
+            src="https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_80,f_auto/IMG_7582_toxf6l" alt="Kartec Tuning — taller de alto desempeño"
+            loading="lazy"
+          >
+          <div class="nos-img-overlay"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT — texto -->
+      <div class="nos-right">
+        <div class="eyebrow reveal"><div class="eyebrow-line"></div><span class="eyebrow-text">Quiénes Somos</span></div>
+        <h2 class="h2 reveal d1">La Casa del<br><em>Alto Desempeño</em><br>en Venezuela</h2>
+
+        <p class="nos-lead reveal d2">
+          Somos el <strong>centro de servicios de entonación dinamométrica automotriz por excelencia en Venezuela.</strong> Expertos en el manejo de sistemas para la entonación de motores a gasolina, diésel y combustibles alternativos. Pioneros en la optimización de potencia, autonomía y eficiencia de combustible mediante computadoras de soporte y reprogramaciones, en un ambiente tecnológicamente hábil y seguro para su vehículo.
+        </p>
+
+        <div class="nos-pillars reveal d2">
+          <div class="nos-pillar">
+            <span class="nos-p-num">01</span>
+            <div>
+              <div class="nos-p-title">Cobertura Total de Combustibles</div>
+              <p class="nos-p-body">Motores a gasolina, diésel y combustibles alternativos. Dominio técnico en cualquier arquitectura de motor.</p>
+            </div>
+          </div>
+          <div class="nos-pillar">
+            <span class="nos-p-num">02</span>
+            <div>
+              <div class="nos-p-title">Tecnología de Soporte Avanzada</div>
+              <p class="nos-p-body">Computadoras y sistemas de última generación. Reprogramación en un entorno controlado, seguro para el vehículo y el conductor.</p>
+            </div>
+          </div>
+          <div class="nos-pillar">
+            <span class="nos-p-num">03</span>
+            <div>
+              <div class="nos-p-title">Récords en Pista — Nunca Antes Vistos</div>
+              <p class="nos-p-body">Marcas históricas en Sport Compacts de 4 y 8 cilindros en Venezuela. Resultados que hablan por sí solos.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="nos-founder reveal d3">
+          <div class="nos-founder-tag">⚡ Fundador — Historia de Formación</div>
+          <p class="nos-founder-text">
+            Administrador de profesión, su pasión por los vehículos lo llevó a estudiar a finales del año 2000 en <strong style="color:var(--white);font-style:normal">Sudáfrica</strong>, donde fue becado por la casa matriz del UNICHIP —<strong style="color:var(--white);font-style:normal"> Dastek</strong>, en la ciudad de Pretoria. A través de una <strong style="color:var(--copper);font-style:normal">década de estudio y experiencia alrededor del mundo</strong>, y la implementación de los sistemas más avanzados para entonar un motor, consagraron la capacidad técnica para realizar cualquier tipo de entonación y modificación en pro del alto desempeño en la rama automotriz.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ SERVICES ══ -->
+<section id="services" class="pad" style="position:relative;background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_1800,q_60,f_auto/IMG_7585_qgib7k');background-size:cover;background-position:center;background-attachment:fixed;">
+  <div style="position:absolute;inset:0;background:rgba(4,4,4,0.88);z-index:0;pointer-events:none;"></div>
+  <div class="wrap" style="position:relative;z-index:1;">
+    <div class="sv-header">
+      <div class="eyebrow reveal"><div class="eyebrow-line"></div><span class="eyebrow-text">Especialidades</span></div>
+      <h2 class="h2 reveal d1">Ingeniería de Performance<br><em>de Clase Internacional</em></h2>
+    </div>
+    <div class="sv-grid reveal d2">
+      <div class="sv-card">
+        <span class="sv-num">01</span>
+        <div class="sv-icon">🔬</div>
+        <div class="sv-name">Reprogramación ECU</div>
+        <p class="sv-desc">Calibración profesional del mapa original mediante software de ingeniería. Liberamos el potencial bloqueado de fábrica con parámetros optimizados para máximo rendimiento.</p>
+        <div class="sv-spec">Stage 1 / Stage 2 / Stage 3</div>
+      </div>
+      <div class="sv-card">
+        <span class="sv-num">02</span>
+        <div class="sv-icon">📊</div>
+        <div class="sv-name">Dyno Testing</div>
+        <p class="sv-desc">Validación en banco dinamométrico con trazado de curvas de potencia y torque. Datos reales, antes y después de cada optimización.</p>
+        <div class="sv-spec">Análisis Pre & Post Tune</div>
+      </div>
+      <div class="sv-card">
+        <span class="sv-num">03</span>
+        <div class="sv-icon">⚡</div>
+        <div class="sv-name">Performance Diésel</div>
+        <p class="sv-desc">Especialistas en motores diésel Common Rail de alta presión. Amarok, Hilux, Ranger, Discovery. Maximizamos presión de inyección, boost y torque en baja.</p>
+        <div class="sv-spec">TDI · CDI · Common Rail</div>
+      </div>
+      <div class="sv-card">
+        <span class="sv-num">04</span>
+        <div class="sv-icon">🏆</div>
+        <div class="sv-name">Preparación Deportiva</div>
+        <p class="sv-desc">Paquetes integrales para competición y track days. Desde ajuste de suspensión y frenos hasta etapas de turbo y módulos específicos.</p>
+        <div class="sv-spec">Competition · Street Sport</div>
+      </div>
+      <div class="sv-card">
+        <span class="sv-num">05</span>
+        <div class="sv-icon">🛡</div>
+        <div class="sv-name">Ecotuning</div>
+        <p class="sv-desc">Optimización orientada a eficiencia sin sacrificar potencia. Reducción de consumo entre 8% y 15% en ciclos de ruta mediante recalibración de inyección.</p>
+        <div class="sv-spec">Eficiencia · Diésel · Gasolina</div>
+      </div>
+      <div class="sv-card">
+        <span class="sv-num">06</span>
+        <div class="sv-icon">🔧</div>
+        <div class="sv-name">Diagnóstico Avanzado</div>
+        <p class="sv-desc">Lectura profunda de módulos ECU, TCU y ABS. Identificación de fallas ocultas y análisis de parámetros en tiempo real con equipo profesional multimarca.</p>
+        <div class="sv-spec">Multimarca · OBD Pro</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ REPROGRAMACIONES ══ -->
+<section id="repro" class="pad" style="background:var(--ink);display:none">
+  <div class="wrap">
+
+    <!-- Intro -->
+    <div class="repro-intro reveal">
+      <div class="eyebrow" style="justify-content:center"><div class="eyebrow-line"></div><span class="eyebrow-text">La Casa del UNICHIP en Venezuela</span><div class="eyebrow-line" style="transform:scaleX(-1)"></div></div>
+      <h2 class="h2" style="margin:16px 0 20px">Reprogramaciones &<br><em>Tecnología UNICHIP</em></h2>
+      <p>Sistema de microcomputadora de inyección programable que se instala entre la ECU y los sensores del motor — potencia real, sin modificar la computadora original de fábrica.</p>
+    </div>
+
+    <!-- ¿Qué es el UNICHIP? -->
+    <div class="unichip-block reveal">
+      <div class="unichip-img">
+        <img src="https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_80,f_auto/Unichip-X-and-x-connect_xussoq" alt="¿Qué es el UNICHIP?">
+      </div>
+      <div class="unichip-body">
+        <div class="unichip-tag">⚡ Tecnología de Punta</div>
+        <div class="unichip-title">¿Qué es el<br><span>UNICHIP?</span></div>
+        <p class="unichip-desc">
+          Es una micro computadora con la versatilidad de una inyección programable, colocada entre la unidad de control de motor (ECU) y los sensores. Modifica la cantidad de mezcla inyectada y el avance del encendido para optimizar el rendimiento del motor.<br><br>
+          Mediante el sistema se pueden modificar: levas variables, presión de turbo, inyectores adicionales, óxido nitroso (NOS), entre otros — conservando todos los parámetros de corrección de inyección originales.
+        </p>
+        <div class="unichip-chips">
+          <span class="uc-chip">Gasolina</span>
+          <span class="uc-chip">Diésel</span>
+          <span class="uc-chip">Combustibles Alternativos</span>
+          <span class="uc-chip">Turbo</span>
+          <span class="uc-chip">NOS</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ventajas -->
+    <div class="repro-mapas-head reveal">
+      <div class="eyebrow"><div class="eyebrow-line"></div><span class="eyebrow-text">Ventajas de Instalar</span></div>
+    </div>
+    <div class="repro-ventajas reveal d1">
+      <div class="rv-card">
+        <span class="rv-icon">⚡</span>
+        <div class="rv-title">Más Potencia y Más Torque</div>
+        <p class="rv-body">Selector de mapas vía Bluetooth programables por el usuario. Throttle Sprint Booster Q4 para optimización del acelerador electrónico.</p>
+      </div>
+      <div class="rv-card">
+        <span class="rv-icon">⛽</span>
+        <div class="rv-title">Menos Consumo de Combustible</div>
+        <p class="rv-body">Remueve limitadores de velocidad. Se entona en un proceso sumamente seguro que toma unas 3 horas en un ambiente controlado.</p>
+      </div>
+      <div class="rv-card">
+        <span class="rv-icon">🔄</span>
+        <div class="rv-title">Versátil y Compacto</div>
+        <p class="rv-body">El UNICHIP puede ser reutilizado, protegiendo tu inversión en el tiempo. No causa daño al motor — una vez removido, el vehículo queda original como vino de fábrica.</p>
+      </div>
+    </div>
+
+    <!-- 5 Mapas -->
+    <div class="repro-mapas-head reveal">
+      <div class="eyebrow"><div class="eyebrow-line"></div><span class="eyebrow-text">Control Total desde tu Móvil</span></div>
+      <h3 style="font-family:var(--f-head);font-size:22px;font-weight:700;color:var(--white);margin-top:12px">5 Mapas Programables vía Bluetooth</h3>
+    </div>
+    <div class="mapas-grid reveal d1">
+      <div class="mapa-card">
+        <div class="mapa-num">01</div>
+        <div class="mapa-name">Alto Octanaje</div>
+        <p class="mapa-desc">Activación del modo Mayor potencia y rendimiento, manteniendo protegido el motor.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">02</div>
+        <div class="mapa-name">Bajo Octanaje</div>
+        <p class="mapa-desc">Modo protección contra detonaciones con desplazamiento libre y seguro.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">03</div>
+        <div class="mapa-name">Valet Parking</div>
+        <p class="mapa-desc">Limitación de RPM programable desde 3000 RPM. Ideal para cuidar tu vehículo.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">04</div>
+        <div class="mapa-name">Economy</div>
+        <p class="mapa-desc">Envío de señales de regulación a los inyectores para economizar combustible.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">05</div>
+        <div class="mapa-name">Inmovilizador</div>
+        <p class="mapa-desc">Activación del modo envío de señal de aceleración de pedal sin respuesta obsoluta.</p>
+      </div>
+    </div>
+
+    <!-- Video en acción -->
+    <div class="repro-resultado reveal">
+      <div class="rr-img" style="position:relative;overflow:hidden;background:var(--ink-2);">
+        <!-- Cartel "En Acción" -->
+        <div style="
+          position:absolute;top:18px;left:18px;z-index:3;
+          display:inline-flex;align-items:center;gap:8px;
+          background:var(--copper);color:var(--ink);
+          font-family:var(--f-mono);font-weight:800;font-size:11px;
+          letter-spacing:0.22em;text-transform:uppercase;
+          padding:6px 16px;
+          clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+        ">▶ EN ACCIÓN</div>
+        <video
+          autoplay muted loop playsinline preload="auto"
+          style="width:100%;height:100%;object-fit:cover;display:block;filter:saturate(0.85);"
+        >
+          <source src="https://res.cloudinary.com/dpiavcukm/video/upload/v1781222869/insta_video_62856_mkwxos.mp4" type="video/mp4">
+        </video>
+      </div>
+      <div class="rr-body">
+        <div class="rr-tag">🎬 UNICHIP En Acción</div>
+        <div class="rr-title">Mirá cómo funciona<br>el <span style="color:var(--copper)">UNICHIP</span></div>
+        <p style="font-size:15px;line-height:1.8;color:var(--white-60);margin:16px 0 24px;">
+          Este video muestra y explica en detalle cómo el sistema UNICHIP se instala, opera y transforma el rendimiento de tu motor — potencia real, en tiempo real.
+        </p>
+        <div style="margin-top:28px">
+          <button class="btn-copper" onclick="openCP()">⚡ Solicitar Mi Evaluación</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══ CASES ══ -->
+<section id="cases" class="pad" style="position:relative;background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/v1781214619/IMG_7592_js7wdv.jpg');background-size:cover;background-position:center;background-attachment:fixed;background-color:var(--ink)">
+  <div style="position:absolute;inset:0;background:rgba(4,4,4,0.88);z-index:0;"></div>
+  <div class="wrap" style="position:relative;z-index:1;">
+    <div class="cases-header">
+      <div>
+        <div class="eyebrow reveal"><div class="eyebrow-line"></div><span class="eyebrow-text">Casos de Éxito</span></div>
+        <h2 class="h2 reveal d1">Resultados <em>Reales</em><br>en Números Reales</h2>
+      </div>
+      <a href="https://wa.me/584142521941?text=Hola+Kartec%2C+quiero+ver+m%C3%A1s+casos+de+optimizaci%C3%B3n." target="_blank" class="btn-ghost reveal d1" style="align-self:flex-end">Ver todos →</a>
+    </div>
+    <div class="cases-grid">
+
+      <!-- ── EVO IX — slider de 4 fotos ── -->
+      <div class="case-card reveal" style="grid-column:span 2;">
+        <div class="cc-visual" style="height:320px; position:relative;">
+          <!-- Slider -->
+          <div class="cc-slider" id="evoSlider" style="position:absolute;inset:0;overflow:hidden;">
+            <div class="cc-slide active" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_1200,q_80,f_auto/IMG_7568_pzxhlt');"></div>
+            <div class="cc-slide"        style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_1200,q_80,f_auto/IMG_7567_wfaish');"></div>
+            <div class="cc-slide"        style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_1200,q_80,f_auto/IMG_7563_n4rmug');"></div>
+            <div class="cc-slide"        style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_1200,q_80,f_auto/IMG_7564_jvsk4r');"></div>
+          </div>
+          <!-- Gradient overlay -->
+          <div style="position:absolute;inset:0;z-index:2;background:linear-gradient(0deg,rgba(10,10,10,0.85) 0%,rgba(10,10,10,0.2) 55%,transparent 100%);pointer-events:none;"></div>
+          <!-- Slide dots -->
+          <div class="cc-dots" style="position:absolute;bottom:72px;left:22px;z-index:4;display:flex;gap:6px;" id="evoDots">
+            <span class="cc-dot on" onclick="goSlide('evoSlider','evoDots',0)"></span>
+            <span class="cc-dot"    onclick="goSlide('evoSlider','evoDots',1)"></span>
+            <span class="cc-dot"    onclick="goSlide('evoSlider','evoDots',2)"></span>
+            <span class="cc-dot"    onclick="goSlide('evoSlider','evoDots',3)"></span>
+          </div>
+          <!-- Arrows -->
+          <button class="cc-arr cc-arr-l" onclick="shiftSlide('evoSlider','evoDots',-1)">‹</button>
+          <button class="cc-arr cc-arr-r" onclick="shiftSlide('evoSlider','evoDots', 1)">›</button>
+          <!-- Model label -->
+          <div class="cc-model" style="z-index:4;">
+            <div class="cc-name">Mitsubishi Lancer EVO IX</div>
+            <div class="cc-sub">Record Venezuela · 4 Cilindros</div>
+          </div>
+          <div class="cc-badge" style="z-index:4;">Récord Nacional</div>
+        </div>
+        <div class="cc-data">
+          <div class="cc-metrics" style="grid-template-columns:repeat(4,1fr);">
+            <div class="cc-m" style="grid-column:span 2;background:rgba(255,59,26,0.08);">
+              <span class="cc-m-lbl" style="color:var(--fire);opacity:0.85;">🏆 Logro Histórico</span>
+              <span class="cc-m-val" style="color:var(--fire);font-size:20px;line-height:1.2;">8.9X seg<br><span style="font-size:13px;font-weight:500;letter-spacing:0.05em;">¼ milla</span></span>
+            </div>
+            <div class="cc-m aft"><span class="cc-m-lbl">Motor</span><span class="cc-m-val" style="font-size:17px;">4G63T</span></div>
+            <div class="cc-m aft"><span class="cc-m-lbl">Cilindros</span><span class="cc-m-val">4 cil.</span></div>
+          </div>
+          <div class="cc-tags">
+            <span class="cc-tag">1er 4 Cil. sub-9s Venezuela</span>
+            <span class="cc-tag">UNICHIP</span>
+            <span class="cc-tag">Full Prep. Kartec</span>
+            <span class="cc-tag">Dyno Verified</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Toyota Supra MK4 ── -->
+      <div class="case-card reveal d1">
+        <div class="cc-visual">
+          <div class="cc-visual-img" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_80,f_auto/IMG_7560_ombo7c');"></div>
+          <div class="cc-model">
+            <div class="cc-name">Toyota Supra MK4</div>
+            <div class="cc-sub">2JZ-GTE · Full Build</div>
+          </div>
+          <div class="cc-badge">+1200 WHP</div>
+        </div>
+        <div class="cc-data">
+          <div class="cc-metrics">
+            <div class="cc-m"><span class="cc-m-lbl">Motor</span><span class="cc-m-val" style="font-size:18px;">2JZ</span></div>
+            <div class="cc-m aft"><span class="cc-m-lbl">WHP Final</span><span class="cc-m-val">1200+</span></div>
+            <div class="cc-m"><span class="cc-m-lbl">Config.</span><span class="cc-m-val" style="font-size:16px;">Single</span></div>
+            <div class="cc-m aft"><span class="cc-m-lbl">Mapeo</span><span class="cc-m-val" style="font-size:15px;">UNICHIP</span></div>
+          </div>
+          <div class="cc-tags">
+            <span class="cc-tag">+1200 WHP</span>
+            <span class="cc-tag">UNICHIP</span>
+            <span class="cc-tag">Single Turbo</span>
+            <span class="cc-tag">2JZ-GTE</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Nissan GTR 2015 ── -->
+      <div class="case-card reveal d2">
+        <div class="cc-visual" style="position:relative;">
+          <!-- Slider 3 fotos -->
+          <div class="cc-slider" id="gtrSlider" style="position:absolute;inset:0;overflow:hidden;">
+            <div class="cc-slide active" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_80,f_auto/IMG_7582_toxf6l');"></div>
+            <div class="cc-slide"        style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_80,f_auto/IMG_7562_vi1nwf');"></div>
+            <div class="cc-slide"        style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_80,f_auto/IMG_7581_hwcgva');"></div>
+          </div>
+          <div style="position:absolute;inset:0;z-index:2;background:linear-gradient(0deg,rgba(10,10,10,0.85) 0%,rgba(10,10,10,0.2) 55%,transparent 100%);pointer-events:none;"></div>
+          <div class="cc-dots" style="position:absolute;bottom:72px;left:22px;z-index:4;display:flex;gap:6px;" id="gtrDots">
+            <span class="cc-dot on" onclick="goSlide('gtrSlider','gtrDots',0)"></span>
+            <span class="cc-dot"    onclick="goSlide('gtrSlider','gtrDots',1)"></span>
+            <span class="cc-dot"    onclick="goSlide('gtrSlider','gtrDots',2)"></span>
+          </div>
+          <button class="cc-arr cc-arr-l" onclick="shiftSlide('gtrSlider','gtrDots',-1)">‹</button>
+          <button class="cc-arr cc-arr-r" onclick="shiftSlide('gtrSlider','gtrDots', 1)">›</button>
+          <div class="cc-model" style="z-index:4;">
+            <div class="cc-name">Nissan GT-R 2015</div>
+            <div class="cc-sub">Kartec Build · VR38DETT</div>
+          </div>
+          <div class="cc-badge" style="z-index:4;">1600 WHP</div>
+        </div>
+        <div class="cc-data">
+          <div class="cc-metrics">
+            <div class="cc-m"><span class="cc-m-lbl">Motor</span><span class="cc-m-val" style="font-size:15px;">VR38</span></div>
+            <div class="cc-m aft"><span class="cc-m-lbl">WHP Final</span><span class="cc-m-val">1600</span></div>
+            <div class="cc-m"><span class="cc-m-lbl">Mapas</span><span class="cc-m-val">4</span></div>
+            <div class="cc-m aft"><span class="cc-m-lbl">Sistema</span><span class="cc-m-val" style="font-size:14px;">UNICHIP</span></div>
+          </div>
+          <div class="cc-tags">
+            <span class="cc-tag">1600 WHP</span>
+            <span class="cc-tag">4 Mapas</span>
+            <span class="cc-tag">UNICHIP</span>
+            <span class="cc-tag">Kartec Full Build</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Slider styles + JS -->
+    <style>
+    .cc-slide {
+      position:absolute; inset:0;
+      background-size:cover; background-position:center;
+      opacity:0; transition:opacity 0.6s var(--ease-out);
+      filter:saturate(0.7) brightness(0.6);
+    }
+    .cc-slide.active { opacity:1; }
+    .cc-dot {
+      width:6px; height:6px; border-radius:50%;
+      background:var(--white-35); cursor:pointer;
+      transition:background 0.25s, transform 0.25s;
+    }
+    .cc-dot.on { background:var(--copper); transform:scale(1.4); }
+    .cc-arr {
+      position:absolute; top:50%; transform:translateY(-50%);
+      z-index:4; background:rgba(4,4,4,0.55); border:1px solid var(--copper-20);
+      color:var(--white-60); cursor:pointer;
+      font-size:22px; line-height:1; padding:6px 12px;
+      transition:all 0.2s;
+    }
+    .cc-arr:hover { background:var(--copper); color:var(--ink); border-color:var(--copper); }
+    .cc-arr-l { left:12px; }
+    .cc-arr-r { right:12px; }
+    </style>
+    <script>
+    function goSlide(sliderId, dotsId, idx){
+      const slides=[...document.querySelectorAll('#'+sliderId+' .cc-slide')];
+      const dots=[...document.querySelectorAll('#'+dotsId+' .cc-dot')];
+      slides.forEach(s=>s.classList.remove('active'));
+      dots.forEach(d=>d.classList.remove('on'));
+      if(slides[idx]) slides[idx].classList.add('active');
+      if(dots[idx])   dots[idx].classList.add('on');
+    }
+    function shiftSlide(sliderId, dotsId, dir){
+      const slides=[...document.querySelectorAll('#'+sliderId+' .cc-slide')];
+      const cur=slides.findIndex(s=>s.classList.contains('active'));
+      const next=(cur+dir+slides.length)%slides.length;
+      goSlide(sliderId, dotsId, next);
+    }
+    // Auto-advance
+    setInterval(()=>shiftSlide('evoSlider','evoDots', 1), 4000);
+    setInterval(()=>shiftSlide('gtrSlider','gtrDots', 1), 4500);
+    </script>
+  </div>
+</section>
+
+<!-- ══ NUMBERS ══ -->
+<div class="numbers-band">
+  <div class="wrap">
+    <div class="numbers-inner">
+      <div class="n-item reveal"><span class="n-num" data-cnt="850" data-s="+">0</span><span class="n-lbl">Vehículos optimizados</span></div>
+      <div class="n-item reveal d1"><span class="n-num" data-cnt="12" data-s="">0</span><span class="n-lbl">Años en el mercado</span></div>
+      <div class="n-item reveal d2"><span class="n-num" data-cnt="68" data-s="%">0</span><span class="n-lbl">Ganancia máx. registrada</span></div>
+      <div class="n-item reveal d3"><span class="n-num" data-cnt="150" data-s="+">0</span><span class="n-lbl">Modelos mapeados</span></div>
+      <div class="n-item reveal d4"><span class="n-num" data-cnt="123" data-s="K">0</span><span class="n-lbl">Seguidores Instagram</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PROJECTS ══ -->
+<section id="projects" class="pad" style="position:relative;background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/v1781214620/IMG_7588_uruxww.jpg');background-size:cover;background-position:center;background-attachment:fixed;">
+  <div style="position:absolute;inset:0;background:rgba(4,4,4,0.88);z-index:0;"></div>
+  <div class="wrap" style="position:relative;z-index:1;">
+    <div class="proj-header">
+      <div class="eyebrow reveal"><div class="eyebrow-line"></div><span class="eyebrow-text">Biblioteca de Proyectos</span></div>
+      <h2 class="h2 reveal d1">Cada Vehículo,<br>Una <em>Historia</em> de Potencia</h2>
+    </div>
+    <div class="proj-filters reveal d2">
+      <button class="pf-btn on" onclick="fp(this,'all')">Todos</button>
+      <button class="pf-btn" onclick="fp(this,'pickup')">Pickups</button>
+      <button class="pf-btn" onclick="fp(this,'sport')">Deportivos</button>
+      <button class="pf-btn" onclick="fp(this,'suv')">SUV</button>
+      <button class="pf-btn" onclick="fp(this,'diesel')">Diésel</button>
+      <button class="pf-btn" onclick="fp(this,'gas')">Gasolina</button>
+    </div>
+    <div class="proj-grid reveal d3">
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_75,f_auto/IMG_7580_antrz2')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Kartec · Taller</span><div class="pj-name">High Performance Shop</div><div class="pj-gains">Caracas · Venezuela</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_75,f_auto/IMG_7573_goxjt1')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Deportivo · Gasolina</span><div class="pj-name">Kartec Build</div><div class="pj-gains">UNICHIP · Full Prep</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_700,q_75,f_auto/IMG_7570_hdkrp0')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Deportivo · Gasolina</span><div class="pj-name">Kartec Build</div><div class="pj-gains">UNICHIP · Stage</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_700,q_75,f_auto/IMG_7569_lmbb5a')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Dyno · Gasolina</span><div class="pj-name">Kartec Build</div><div class="pj-gains">Dyno Verified</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_700,q_75,f_auto/IMG_7591_zr1czz')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Kartec · Taller</span><div class="pj-name">Kartec Workshop</div><div class="pj-gains">Performance Engineering</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_75,f_auto/IMG_7583_zacguf')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Deportivo · Gasolina</span><div class="pj-name">Kartec Build</div><div class="pj-gains">UNICHIP · Stage</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_700,q_75,f_auto/IMG_7571_k5yuht')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Deportivo · Gasolina</span><div class="pj-name">Kartec Build</div><div class="pj-gains">UNICHIP · Full Prep</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_75,f_auto/IMG_7592_js7wdv')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Kartec · Dyno</span><div class="pj-name">Kartec Build</div><div class="pj-gains">Dyno Testing</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_700,q_75,f_auto/IMG_7595_jymdbb')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Kartec · Workshop</span><div class="pj-name">Kartec Build</div><div class="pj-gains">Performance Shop</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+      <div class="pj" data-c="sport gas"><div class="pj-bg" style="background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_700,q_75,f_auto/IMG_7589_lmhggg')"></div><div class="pj-overlay"></div><div class="pj-info"><span class="pj-cat">Deportivo · Gasolina</span><div class="pj-name">Kartec Build</div><div class="pj-gains">UNICHIP · Stage</div></div><div class="pj-reveal"><div class="pj-reveal-inner">Ver Proyecto</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CONCIERGE SECTION ══ -->
+<section id="concierge" class="pad" style="position:relative;background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/v1781214620/IMG_7595_jymdbb.jpg');background-size:cover;background-position:center;background-attachment:fixed;">
+  <div style="position:absolute;inset:0;background:rgba(4,4,4,0.88);z-index:0;"></div>
+  <div class="wrap" style="position:relative;z-index:1;">
+    <div class="conc-layout">
+      <div>
+        <div class="eyebrow reveal"><div class="eyebrow-line"></div><span class="eyebrow-text">Performance Concierge IA</span></div>
+        <h2 class="h2 reveal d1">Asesoramiento Técnico<br><em>Inteligente</em> 24/7</h2>
+        <p style="font-size:15px;line-height:1.8;color:var(--white-60);margin:24px 0 40px;max-width:440px" class="reveal d2">Nuestro sistema analiza tu vehículo y entrega una recomendación técnica personalizada con ganancia estimada, etapa recomendada y tiempo de trabajo — en segundos.</p>
+        <button class="btn-copper reveal d3" onclick="openCP()">🤖 Iniciar Análisis Técnico</button>
+      </div>
+      <div class="conc-features reveal d2">
+        <div class="conc-feat">
+          <div class="cf-num">01</div>
+          <div><div class="cf-title">Diagnóstico Instantáneo</div><p class="cf-body">Análisis de potencial basado en datos reales de más de 150 modelos mapeados por Kartec.</p></div>
+        </div>
+        <div class="conc-feat">
+          <div class="cf-num">02</div>
+          <div><div class="cf-title">Recomendación por Etapas</div><p class="cf-body">Stage 1, 2 o 3 según el uso del vehículo, modificaciones previas y objetivos del cliente.</p></div>
+        </div>
+        <div class="conc-feat">
+          <div class="cf-num">03</div>
+          <div><div class="cf-title">Estimado de Tiempo y Proceso</div><p class="cf-body">Tiempo aproximado de trabajo e información de proceso antes de que llegues al taller.</p></div>
+        </div>
+        <div class="conc-feat">
+          <div class="cf-num">04</div>
+          <div><div class="cf-title">Derivación Directa a Especialista</div><p class="cf-body">Conexión inmediata con nuestro equipo vía WhatsApp con contexto del vehículo precargado.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CTA FINAL ══ -->
+<section id="cta-final">
+  <canvas id="pCanvas"></canvas>
+  <div class="cta-bg-text">PERFORMANCE</div>
+  <div class="cta-glow"></div>
+  <div class="wrap" style="position:relative;z-index:1">
+    <div style="text-align:center">
+      <div class="eyebrow reveal" style="justify-content:center"><div class="eyebrow-line"></div><span class="eyebrow-text">Kartec Performance Venezuela</span><div class="eyebrow-line" style="transform:scaleX(-1)"></div></div>
+      <h2 class="cta-title reveal d1">
+        Tu Vehículo Tiene<br>
+        <em>Más Potencial</em><br>
+        Del Que Imaginas
+      </h2>
+      <p class="cta-sub reveal d2">Únete a más de 850 propietarios que ya liberaron el ADN real de su vehículo con Kartec.</p>
+      <div class="cta-actions reveal d3">
+        <button class="btn-copper" style="font-size:13px;padding:16px 40px" onclick="openCP()">⚡ Solicitar Evaluación Técnica</button>
+        <a href="https://wa.me/584142521941?text=Hola+Kartec%2C+quiero+solicitar+una+evaluaci%C3%B3n+t%C3%A9cnica+de+mi+veh%C3%ADculo." target="_blank" class="btn-wa">📲 WhatsApp Directo</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer id="contact">
+  <div class="wrap">
+    <div class="ft-grid">
+      <div>
+        <div class="ft-logo">KARTEC TUNING</div>
+        <p class="ft-about">Ingeniería de performance automotriz de clase internacional. La Casa del UNICHIP en Venezuela. Especialistas en ECU, dyno testing y optimización electrónica.</p>
+        <div class="ft-socials">
+          <a href="https://instagram.com/kartectuning" target="_blank" class="ft-soc">ig</a>
+          <a href="#" class="ft-soc">fb</a>
+          <a href="#" class="ft-soc">yt</a>
+          <a href="#" class="ft-soc">tk</a>
+        </div>
+      </div>
+      <div>
+        <div class="ft-col-head">Servicios</div>
+        <ul class="ft-links">
+          <li><a href="#">Reprogramación ECU</a></li>
+          <li><a href="#">Dyno Testing</a></li>
+          <li><a href="#">Performance Diésel</a></li>
+          <li><a href="#">Ecotuning</a></li>
+          <li><a href="#">Preparación Deportiva</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="ft-col-head">Vehículos</div>
+        <ul class="ft-links">
+          <li><a href="#">Pickups y 4×4</a></li>
+          <li><a href="#">Deportivos</a></li>
+          <li><a href="#">SUV Premium</a></li>
+          <li><a href="#">Sedán Performance</a></li>
+          <li><a href="#">Diésel Common Rail</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="ft-col-head">Contacto</div>
+        <ul class="ft-links">
+          <li><a href="#">📍 F5XF+5X5, Caracas 1071</a></li>
+          <li><a href="#">📍 Miranda, Venezuela</a></li>
+          <li><a href="https://wa.me/584142521941" target="_blank">📲 +58 414-2521941</a></li>
+          <li><a href="https://instagram.com/kartectuning" target="_blank">📷 @kartectuning</a></li>
+          <li><a href="#">🕗 Abre a las 8 a.m.</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ft-bottom">
+      <div class="ft-copy">© 2024 Kartec Tuning Venezuela</div>
+      <div class="ft-copy" style="color:rgba(200,117,31,0.3)">Engineered for Performance · La Casa del UNICHIP</div>
+    </div>
+  </div>
+</footer>
+
+<!-- ══ CONCIERGE PANEL ══ -->
+<div class="cp-overlay" id="cpOverlay">
+  <div class="cp-panel" id="cpPanel">
+    <div class="cp-head">
+      <div class="cp-head-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      </div>
+      <div>
+        <div class="cp-head-title">Kartec Performance Concierge</div>
+        <div class="cp-head-sub">Asesoramiento técnico de alto rendimiento</div>
+      </div>
+      <button class="cp-close" onclick="closeCP()">✕</button>
+    </div>
+    <div class="cp-scroll">
+      <div class="cp-section-head">Paso 1 — Tu vehículo</div>
+      <div class="cp-inputs">
+        <input class="cp-inp" id="cpM" placeholder="Marca (ej: Volkswagen, Toyota...)">
+        <input class="cp-inp" id="cpMo" placeholder="Modelo (ej: Amarok V6, Hilux...)">
+        <input class="cp-inp" id="cpA" placeholder="Año (ej: 2022)">
+        <input class="cp-inp" id="cpE" placeholder="Motor (ej: 3.0 TDI, 2.0 TSI...)">
+      </div>
+      <div class="cp-section-head">Paso 2 — Objetivo</div>
+      <div class="cp-opts">
+        <div class="cp-opt" onclick="selObj(this,'Más potencia')">⚡ Más potencia</div>
+        <div class="cp-opt" onclick="selObj(this,'Mejor respuesta')">🎯 Mejor respuesta</div>
+        <div class="cp-opt" onclick="selObj(this,'Menor consumo')">💧 Menor consumo</div>
+        <div class="cp-opt" onclick="selObj(this,'Preparación deportiva')">🏁 Deportivo</div>
+      </div>
+      <button class="cp-run" id="cpRunBtn" onclick="runConcierge()">🔬 ANALIZAR MI VEHÍCULO</button>
+      <div class="cp-result-box" id="cpRes">
+        <div class="cp-res-head" id="cpResText">—</div>
+        <div class="cp-metrics-grid">
+          <div class="cp-met"><span class="cp-met-val" id="rHP">—</span><span class="cp-met-lbl">+HP</span></div>
+          <div class="cp-met"><span class="cp-met-val" id="rTQ">—</span><span class="cp-met-lbl">+Torque</span></div>
+          <div class="cp-met"><span class="cp-met-val" id="rTime">—</span><span class="cp-met-lbl">Tiempo</span></div>
+          <div class="cp-met"><span class="cp-met-val" id="rStage">—</span><span class="cp-met-lbl">Etapa</span></div>
+        </div>
+        <div class="cp-bens" id="cpBens"></div>
+        <a href="#" class="cp-wa" id="cpWaLink" target="_blank">📲 Hablar con un Especialista Kartec</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════ -->
+<script>
+/* ── Page load bar ── */
+(function(){
+  const b=document.getElementById('pgBar');
+  b.style.width='60%';
+  window.addEventListener('load',()=>{b.style.width='100%';setTimeout(()=>{b.style.opacity='0';},500);});
+})();
+
+/* ── Hero video iOS autoplay fix ── */
+(function(){
+  const v = document.querySelector('.hero-video-bg video');
+  if(!v) return;
+  v.muted = true;
+  const tryPlay = () => v.play().catch(()=>{});
+  document.addEventListener('touchstart', tryPlay, {once:true});
+  document.addEventListener('click', tryPlay, {once:true});
+  tryPlay();
+})();
+
+/* ── Custom cursor ── */
+const cur=document.getElementById('cur'), curR=document.getElementById('curR');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
+(function ring(){rx+=(mx-rx)*0.1;ry+=(my-ry)*0.1;curR.style.left=rx+'px';curR.style.top=ry+'px';requestAnimationFrame(ring);})();
+
+/* ── Mobile nav ── */
+function toggleMobNav(){
+  const btn=document.getElementById('mobBtn');
+  const nav=document.getElementById('mobNav');
+  btn.classList.toggle('open');
+  nav.classList.toggle('open');
+  document.body.style.overflow=nav.classList.contains('open')?'hidden':'';
+}
+function closeMobNav(){
+  document.getElementById('mobBtn').classList.remove('open');
+  document.getElementById('mobNav').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+/* ── Nav scroll ── */
+window.addEventListener('scroll',()=>{
+  document.getElementById('nav').classList.toggle('s',scrollY>40);
+});
+
+/* ── Reveal on scroll ── */
+const ro=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');ro.unobserve(e.target);}}),{threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
+
+/* ── Counter animation ── */
+function cnt(el){
+  const t=+el.dataset.cnt, s=el.dataset.s||'', d=1800, t0=performance.now();
+  (function go(now){
+    const p=Math.min((now-t0)/d,1), e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(e*t)+s;
+    if(p<1)requestAnimationFrame(go);
+  })(t0);
+}
+const cro=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){cnt(e.target);cro.unobserve(e.target);}}),{threshold:0.5});
+document.querySelectorAll('[data-cnt]').forEach(el=>cro.observe(el));
+
+/* ── Filter projects ── */
+function fp(btn,cat){
+  document.querySelectorAll('.pf-btn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.pj').forEach(c=>{
+    const cats=c.dataset.c||'';
+    c.style.opacity=(cat==='all'||cats.includes(cat))?'1':'0.15';
+    c.style.transition='opacity 0.35s';
+  });
+}
+
+/* ── Particles canvas ── */
+(function(){
+  const cv=document.getElementById('pCanvas');
+  if(!cv)return;
+  const ctx=cv.getContext('2d');
+  let W,H,pts=[];
+  function resize(){W=cv.width=cv.offsetWidth;H=cv.height=cv.offsetHeight;}
+  resize(); window.addEventListener('resize',resize);
+  for(let i=0;i<50;i++)pts.push({x:Math.random()*100,y:Math.random()*100,vx:(Math.random()-.5)*0.015,vy:-(0.01+Math.random()*0.02),a:0.2+Math.random()*0.4,r:1+Math.random()});
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    pts.forEach(p=>{
+      ctx.beginPath();ctx.arc(p.x/100*W,p.y/100*H,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(200,117,31,${p.a})`;ctx.fill();
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.y<-2)p.y=102;
+      if(p.x<-2)p.x=102;if(p.x>102)p.x=-2;
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ── Concierge panel ── */
+let cpOpen=false;
+function openCP(){
+  cpOpen=true;
+  document.getElementById('cpOverlay').style.pointerEvents='all';
+  document.getElementById('cpPanel').classList.add('open');
+}
+function closeCP(){
+  cpOpen=false;
+  document.getElementById('cpPanel').classList.remove('open');
+  setTimeout(()=>document.getElementById('cpOverlay').style.pointerEvents='none',450);
+}
+
+let selObjVal='';
+function selObj(el,v){
+  document.querySelectorAll('.cp-opt').forEach(o=>o.classList.remove('on'));
+  el.classList.add('on'); selObjVal=v;
+}
+
+async function runConcierge(){
+  const m=document.getElementById('cpM').value.trim();
+  const mo=document.getElementById('cpMo').value.trim();
+  const a=document.getElementById('cpA').value.trim();
+  const e=document.getElementById('cpE').value.trim();
+  if(!m||!mo){alert('Ingresa al menos la marca y modelo.');return;}
+  const obj=selObjVal||'Más potencia';
+  const btn=document.getElementById('cpRunBtn');
+  btn.textContent='🔬 ANALIZANDO...'; btn.disabled=true;
+
+  const prompt=`Eres el sistema de análisis técnico de Kartec Tuning Venezuela, especialistas en reprogramación ECU, dyno testing y performance automotriz de clase mundial.
+
+Cliente: ${m} ${mo} ${a} ${e?'Motor: '+e:''}.
+Objetivo: ${obj}.
+
+Responde ÚNICAMENTE con JSON válido sin markdown:
+{"stage":"Stage X","recomendacion":"2 oraciones técnicas en español","gainHP":"+XX HP","gainTQ":"+XX Nm","tiempo":"Xh","beneficios":["b1","b2","b3","b4"]}
+
+Valores deben ser técnicamente correctos para ese vehículo.`;
+
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const data=await r.json();
+    const txt=data.content.map(i=>i.text||'').join('');
+    const parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    showResult(parsed,m,mo,obj);
+  }catch(err){
+    const fb=fallback(m,mo,e,obj);
+    showResult(fb,m,mo,obj);
+  }
+  btn.textContent='🔬 ANALIZAR MI VEHÍCULO'; btn.disabled=false;
+}
+
+function showResult(p,m,mo,obj){
+  document.getElementById('rHP').textContent=p.gainHP;
+  document.getElementById('rTQ').textContent=p.gainTQ;
+  document.getElementById('rTime').textContent=p.tiempo;
+  document.getElementById('rStage').textContent=(p.stage||'').replace('Stage ','S');
+  document.getElementById('cpResText').innerHTML=p.recomendacion;
+  const bd=document.getElementById('cpBens'); bd.innerHTML='';
+  (p.beneficios||[]).forEach(b=>{const d=document.createElement('div');d.className='cp-ben';d.textContent=b;bd.appendChild(d);});
+  const msg=encodeURIComponent(`Hola Kartec, tengo un ${m} ${mo} y me interesa la optimización ${p.stage} recomendada por el Concierge IA. Objetivo: ${obj}.`);
+  document.getElementById('cpWaLink').href=`https://wa.me/584142521941?text=${msg}`;
+  document.getElementById('cpRes').classList.add('on');
+}
+
+function fallback(m,mo,e,obj){
+  const d=(e&&(e.toLowerCase().includes('tdi')||e.toLowerCase().includes('diesel')||e.includes('2.8')||e.includes('3.0')));
+  const hi=['rs','gti','gts','amg','m3','m4','sport'].some(k=>(mo||'').toLowerCase().includes(k));
+  return{stage:hi?'Stage 2':'Stage 1',gainHP:hi?'+60 HP':d?'+50 HP':'+40 HP',gainTQ:d?'+120 Nm':'+75 Nm',tiempo:hi?'4h':'2-3h',recomendacion:`Para tu ${m} ${mo} recomendamos una optimización ${hi?'Stage 2':'Stage 1'} con recalibración ECU profesional. Los parámetros serán ajustados para maximizar potencia y respuesta manteniendo confiabilidad total.`,beneficios:['Mejor aceleración desde baja y media carga','Mayor respuesta inmediata del throttle','Mejor recuperación en autopista y ruta','Confiabilidad total para uso diario']};
+}
+</script>
+<!-- ══ MODAL REPROGRAMACIONES ══ -->
+<div id="reproModal" style="
+  display:none; position:fixed; inset:0; z-index:1200;
+  background-color:rgba(4,4,4,0.96);
+  background-image:url('https://res.cloudinary.com/dpiavcukm/image/upload/w_1800,q_60,f_auto/IMG_7584_lbkkyn');
+  background-size:cover; background-position:center; background-attachment:fixed;
+  overflow-y:auto;
+  animation:none;
+">
+  <!-- Dark overlay sobre la imagen -->
+  <div style="position:fixed;inset:0;background:rgba(4,4,4,0.87);z-index:0;pointer-events:none;"></div>
+  <!-- Close button -->
+  <button onclick="closeReproModal()" style="
+    position:sticky; top:24px; left:100%; margin-right:28px;
+    display:flex; align-items:center; gap:8px;
+    background:transparent; border:1px solid rgba(200,117,31,0.35);
+    color:var(--white-60); cursor:pointer;
+    font-family:var(--f-mono); font-weight:700; font-size:11px;
+    letter-spacing:0.2em; text-transform:uppercase;
+    padding:10px 20px; z-index:10;
+    position:relative; z-index:10;
+    transition:all 0.25s;
+    clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+  " onmouseover="this.style.borderColor='var(--copper)';this.style.color='var(--white)'"
+     onmouseout="this.style.borderColor='rgba(200,117,31,0.35)';this.style.color='var(--white-60)'">
+    ✕ &nbsp;CERRAR
+  </button>
+
+  <!-- Content: same as #repro section, inline here -->
+  <div class="wrap" style="padding-top:40px; padding-bottom:80px; position:relative; z-index:1;">
+
+    <div class="repro-intro reveal-modal">
+      <div class="eyebrow" style="justify-content:center"><div class="eyebrow-line"></div><span class="eyebrow-text">La Casa del UNICHIP en Venezuela</span><div class="eyebrow-line" style="transform:scaleX(-1)"></div></div>
+      <h2 class="h2" style="margin:16px 0 20px">Reprogramaciones &<br><em>Tecnología UNICHIP</em></h2>
+      <p style="font-size:16px;line-height:1.8;color:var(--white-60);max-width:640px;margin:0 auto;">Sistema de microcomputadora de inyección programable que se instala entre la ECU y los sensores del motor — potencia real, sin modificar la computadora original de fábrica.</p>
+    </div>
+
+    <div class="unichip-block" style="margin-top:64px;">
+      <div class="unichip-img">
+        <img src="https://res.cloudinary.com/dpiavcukm/image/upload/w_900,q_80,f_auto/Unichip-X-and-x-connect_xussoq" alt="¿Qué es el UNICHIP?">
+      </div>
+      <div class="unichip-body">
+        <div class="unichip-tag">⚡ Tecnología de Punta</div>
+        <div class="unichip-title">¿Qué es el<br><span>UNICHIP?</span></div>
+        <p class="unichip-desc">
+          Es una micro computadora con la versatilidad de una inyección programable, colocada entre la unidad de control de motor (ECU) y los sensores. Modifica la cantidad de mezcla inyectada y el avance del encendido para optimizar el rendimiento del motor.<br><br>
+          Mediante el sistema se pueden modificar: levas variables, presión de turbo, inyectores adicionales, óxido nitroso (NOS), entre otros — conservando todos los parámetros de corrección de inyección originales.
+        </p>
+        <div class="unichip-chips">
+          <span class="uc-chip">Gasolina</span>
+          <span class="uc-chip">Diésel</span>
+          <span class="uc-chip">Combustibles Alternativos</span>
+          <span class="uc-chip">Turbo</span>
+          <span class="uc-chip">NOS</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="repro-mapas-head" style="margin-top:72px;">
+      <div class="eyebrow"><div class="eyebrow-line"></div><span class="eyebrow-text">Ventajas de Instalar</span></div>
+    </div>
+    <div class="repro-ventajas" style="margin-top:24px;">
+      <div class="rv-card">
+        <span class="rv-icon">⚡</span>
+        <div class="rv-title">Más Potencia y Más Torque</div>
+        <p class="rv-body">Selector de mapas vía Bluetooth programables por el usuario. Throttle Sprint Booster Q4 para optimización del acelerador electrónico.</p>
+      </div>
+      <div class="rv-card">
+        <span class="rv-icon">⛽</span>
+        <div class="rv-title">Menos Consumo de Combustible</div>
+        <p class="rv-body">Remueve limitadores de velocidad. Se entona en un proceso sumamente seguro que toma unas 3 horas en un ambiente controlado.</p>
+      </div>
+      <div class="rv-card">
+        <span class="rv-icon">🔄</span>
+        <div class="rv-title">Versátil y Compacto</div>
+        <p class="rv-body">El UNICHIP puede ser reutilizado, protegiendo tu inversión en el tiempo. No causa daño al motor — una vez removido, el vehículo queda original como vino de fábrica.</p>
+      </div>
+    </div>
+
+    <div class="repro-mapas-head" style="margin-top:72px;">
+      <div class="eyebrow"><div class="eyebrow-line"></div><span class="eyebrow-text">Control Total desde tu Móvil</span></div>
+      <h3 style="font-family:var(--f-head);font-size:22px;font-weight:700;color:var(--white);margin-top:12px">5 Mapas Programables vía Bluetooth</h3>
+    </div>
+    <div class="mapas-grid" style="margin-top:24px;">
+      <div class="mapa-card">
+        <div class="mapa-num">01</div>
+        <div class="mapa-name">Alto Octanaje</div>
+        <p class="mapa-desc">Activación del modo Mayor potencia y rendimiento, manteniendo protegido el motor.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">02</div>
+        <div class="mapa-name">Bajo Octanaje</div>
+        <p class="mapa-desc">Modo protección contra detonaciones con desplazamiento libre y seguro.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">03</div>
+        <div class="mapa-name">Valet Parking</div>
+        <p class="mapa-desc">Limitación de RPM programable desde 3000 RPM. Ideal para cuidar tu vehículo.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">04</div>
+        <div class="mapa-name">Economy</div>
+        <p class="mapa-desc">Envío de señales de regulación a los inyectores para economizar combustible.</p>
+      </div>
+      <div class="mapa-card">
+        <div class="mapa-num">05</div>
+        <div class="mapa-name">Inmovilizador</div>
+        <p class="mapa-desc">Activación del modo envío de señal de aceleración de pedal sin respuesta obsoluta.</p>
+      </div>
+    </div>
+
+    <div class="repro-resultado" style="margin-top:72px;">
+      <div class="rr-img" style="position:relative;overflow:hidden;background:var(--ink-2);">
+        <div style="
+          position:absolute;top:18px;left:18px;z-index:3;
+          display:inline-flex;align-items:center;gap:8px;
+          background:var(--copper);color:var(--ink);
+          font-family:var(--f-mono);font-weight:800;font-size:11px;
+          letter-spacing:0.22em;text-transform:uppercase;
+          padding:6px 16px;
+          clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+        ">▶ EN ACCIÓN</div>
+        <video
+          autoplay muted loop playsinline preload="auto"
+          style="width:100%;height:100%;object-fit:cover;display:block;filter:saturate(0.85);"
+        >
+          <source src="https://res.cloudinary.com/dpiavcukm/video/upload/v1781222869/insta_video_62856_mkwxos.mp4" type="video/mp4">
+        </video>
+      </div>
+      <div class="rr-body">
+        <div class="rr-tag">🎬 UNICHIP En Acción</div>
+        <div class="rr-title">Mirá cómo funciona<br>el <span style="color:var(--copper)">UNICHIP</span></div>
+        <p style="font-size:15px;line-height:1.8;color:var(--white-60);margin:16px 0 24px;">
+          Este video muestra y explica en detalle cómo el sistema UNICHIP se instala, opera y transforma el rendimiento de tu motor — potencia real, en tiempo real.
+        </p>
+        <div style="margin-top:28px;display:flex;gap:14px;flex-wrap:wrap;">
+          <button class="btn-copper" onclick="closeReproModal();openCP()">⚡ Solicitar Mi Evaluación</button>
+          <button class="btn-ghost" onclick="closeReproModal()">← Volver al Inicio</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /wrap -->
+</div><!-- /reproModal -->
+
+<style>
+#reproModal { scroll-behavior:smooth; }
+@keyframes reproFadeIn {
+  from { opacity:0; transform:translateY(30px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+#reproModal.open {
+  display:block !important;
+  animation:reproFadeIn 0.45s var(--ease-out) forwards;
+}
+.repro-intro { text-align:center; max-width:700px; margin:0 auto 0; }
+</style>
+
+<script>
+function openReproModal(){
+  const m=document.getElementById('reproModal');
+  m.style.display='block';
+  requestAnimationFrame(()=>m.classList.add('open'));
+  document.body.style.overflow='hidden';
+  m.scrollTop=0;
+}
+function closeReproModal(){
+  const m=document.getElementById('reproModal');
+  m.classList.remove('open');
+  setTimeout(()=>{ m.style.display='none'; },450);
+  document.body.style.overflow='';
+}
+// Close modal on Escape key
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape') closeReproModal();
+});
+</script>
+
+
+<!-- ============================================================
+  KARTEC AI — ASESOR DE PERFORMANCE (Chat flotante)
+  Pegar antes de </body>
+============================================================ -->
+
+<!-- ============ BOTÓN FLOTANTE ============ -->
+<div id="kcFloatBtn" class="kc-float-btn" onclick="kcToggleChat()">
+  <div class="kc-float-tooltip" id="kcTooltip">¿Quieres saber cuánto puede mejorar tu vehículo?</div>
+  <div class="kc-float-pulse"></div>
+  <img src="https://res.cloudinary.com/dpiavcukm/image/upload/v1781216203/IMG_7597_sxgbbj_g01dwh.png" alt="KARTEC" class="kc-float-icon kc-float-logo">
+  <svg class="kc-float-icon kc-icon-close" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </svg>
+</div>
+
+<!-- ============ VENTANA DE CHAT ============ -->
+<div id="kcChatWindow" class="kc-chat-window">
+  <div class="kc-chat-header">
+    <div class="kc-header-left">
+      <div class="kc-avatar">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L4 7V12C4 16.5 7.5 20.5 12 22C16.5 20.5 20 16.5 20 12V7L12 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M9 12L11 14L15.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="kc-status-dot"></span>
+      </div>
+      <div class="kc-header-info">
+        <div class="kc-header-name">Asesor de Performance KARTEC</div>
+        <div class="kc-header-status">En línea · Responde al instante</div>
+      </div>
+    </div>
+    <div class="kc-header-actions">
+      <button class="kc-header-btn" onclick="kcResetChat()" title="Reiniciar conversación">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 4V9H4.58152M19.9381 11C19.446 7.05369 16.0796 4 12 4C8.64262 4 5.76829 6.06817 4.58152 9M4.58152 9H9M20 20V15H19.4185M19.4185 15C18.2317 17.9318 15.3574 20 12 20C7.92038 20 4.55399 16.9463 4.06189 13M19.4185 15H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="kc-header-btn" onclick="kcToggleChat()" title="Cerrar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="kc-chat-body" id="kcChatBody"></div>
+
+  <div class="kc-chat-footer">
+    <div class="kc-input-wrap">
+      <textarea id="kcInput" class="kc-input" placeholder="Escribí tu mensaje..." rows="1" onkeydown="kcHandleKey(event)" oninput="kcAutoGrow(this)"></textarea>
+      <button class="kc-send-btn" id="kcSendBtn" onclick="kcUserSend()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22 2L11 13M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="kc-footer-tag">Powered by <span>KARTEC AI</span> · Performance Automotriz</div>
+  </div>
+</div>
+
+<!-- ============ ESTILOS ============ -->
+<style>
+:root{
+  --kc-ink: var(--ink, #040404);
+  --kc-panel: #0b0b0b;
+  --kc-panel-2: #131313;
+  --kc-copper: var(--copper, #C8751F);
+  --kc-copper-lt: var(--copper-lt, #E8862A);
+  --kc-white: var(--white, #F0EDE8);
+  --kc-white-60: rgba(240,237,232,0.6);
+  --kc-white-12: rgba(240,237,232,0.12);
+  --kc-fire: var(--fire, #FF3B1A);
+  --kc-wa: #1db554;
+  --kc-ease: cubic-bezier(0.22,1,0.36,1);
+  --kc-radius: 22px;
+}
+
+/* ===== BOTÓN FLOTANTE ===== */
+.kc-float-btn{
+  position:fixed; bottom:24px; right:24px; z-index:9998;
+  width:62px; height:62px; border-radius:50%;
+  background:linear-gradient(145deg, var(--kc-copper-lt), var(--kc-copper));
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; box-shadow:0 8px 30px rgba(200,117,31,0.45), 0 2px 10px rgba(0,0,0,0.4);
+  transition:transform .35s var(--kc-ease), box-shadow .35s var(--kc-ease);
+  color:#0a0a0a;
+}
+.kc-float-btn:hover{ transform:scale(1.07); box-shadow:0 10px 36px rgba(200,117,31,0.6), 0 2px 14px rgba(0,0,0,0.5); }
+.kc-float-pulse{
+  position:absolute; inset:0; border-radius:50%;
+  background:rgba(200,117,31,0.55);
+  animation:kcPulse 2.6s ease-out infinite;
+  z-index:-1;
+}
+@keyframes kcPulse{
+  0%{ transform:scale(1); opacity:.7; }
+  70%{ transform:scale(1.9); opacity:0; }
+  100%{ transform:scale(1.9); opacity:0; }
+}
+.kc-float-icon{ transition:opacity .25s var(--kc-ease), transform .25s var(--kc-ease); }
+.kc-float-logo{ width:46px; height:46px; object-fit:contain; }
+.kc-icon-close{ position:absolute; opacity:0; transform:scale(.6) rotate(-45deg); }
+.kc-float-btn.open .kc-float-icon:not(.kc-icon-close){ opacity:0; transform:scale(.6) rotate(45deg); }
+.kc-float-btn.open .kc-icon-close{ opacity:1; transform:scale(1) rotate(0deg); }
+.kc-float-btn.open .kc-float-pulse{ display:none; }
+
+.kc-float-tooltip{
+  position:absolute; right:74px; top:50%; transform:translateY(-50%) translateX(8px);
+  background:rgba(10,10,10,0.92); border:1px solid var(--kc-white-12);
+  backdrop-filter:blur(12px);
+  color:var(--kc-white); font-family:var(--f-body, 'Inter', sans-serif);
+  font-size:13px; line-height:1.4; padding:10px 14px; border-radius:12px;
+  white-space:nowrap; opacity:0; pointer-events:none;
+  transition:opacity .35s var(--kc-ease), transform .35s var(--kc-ease);
+  box-shadow:0 6px 24px rgba(0,0,0,0.4);
+}
+.kc-float-tooltip::after{
+  content:''; position:absolute; right:-5px; top:50%; transform:translateY(-50%) rotate(45deg);
+  width:10px; height:10px; background:rgba(10,10,10,0.92); border-right:1px solid var(--kc-white-12); border-bottom:1px solid var(--kc-white-12);
+}
+.kc-float-btn:hover .kc-float-tooltip{ opacity:1; transform:translateY(-50%) translateX(0); }
+.kc-float-btn.open .kc-float-tooltip{ opacity:0 !important; }
+.kc-float-tooltip.kc-show-once{ opacity:1; transform:translateY(-50%) translateX(0); }
+
+/* ===== VENTANA DE CHAT ===== */
+.kc-chat-window{
+  position:fixed; bottom:100px; right:24px; z-index:9999;
+  width:380px; max-width:calc(100vw - 32px);
+  height:min(620px, calc(100vh - 140px));
+  background:linear-gradient(165deg, rgba(19,19,19,0.92), rgba(8,8,8,0.96));
+  border:1px solid var(--kc-white-12);
+  border-radius:var(--kc-radius);
+  backdrop-filter:blur(22px) saturate(140%);
+  box-shadow:0 24px 70px rgba(0,0,0,0.55), 0 0 0 1px rgba(200,117,31,0.06);
+  display:flex; flex-direction:column; overflow:hidden;
+  opacity:0; visibility:hidden; transform:translateY(24px) scale(0.97);
+  transform-origin:bottom right;
+  transition:opacity .4s var(--kc-ease), transform .4s var(--kc-ease), visibility .4s;
+  font-family:var(--f-body, 'Inter', sans-serif);
+}
+.kc-chat-window.open{
+  opacity:1; visibility:visible; transform:translateY(0) scale(1);
+}
+
+/* Header */
+.kc-chat-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 18px;
+  background:linear-gradient(135deg, rgba(200,117,31,0.16), rgba(0,0,0,0));
+  border-bottom:1px solid var(--kc-white-12);
+  flex-shrink:0;
+}
+.kc-header-left{ display:flex; align-items:center; gap:12px; }
+.kc-avatar{
+  position:relative; width:40px; height:40px; border-radius:12px;
+  background:linear-gradient(145deg, var(--kc-copper-lt), var(--kc-copper));
+  display:flex; align-items:center; justify-content:center; color:#0a0a0a;
+  flex-shrink:0;
+}
+.kc-status-dot{
+  position:absolute; bottom:-2px; right:-2px; width:11px; height:11px;
+  background:#22C55E; border:2px solid var(--kc-ink); border-radius:50%;
+}
+.kc-header-name{ font-family:var(--f-head,'Space Grotesk',sans-serif); font-weight:600; font-size:14px; color:var(--kc-white); letter-spacing:.2px; }
+.kc-header-status{ font-size:11.5px; color:var(--kc-white-60); margin-top:2px; }
+.kc-header-actions{ display:flex; gap:6px; }
+.kc-header-btn{
+  width:32px; height:32px; border-radius:9px; border:1px solid transparent;
+  background:transparent; color:var(--kc-white-60); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .25s var(--kc-ease);
+}
+.kc-header-btn:hover{ background:var(--kc-white-12); color:var(--kc-white); }
+
+/* Body */
+.kc-chat-body{
+  flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:12px;
+  scroll-behavior:smooth;
+}
+.kc-chat-body::-webkit-scrollbar{ width:5px; }
+.kc-chat-body::-webkit-scrollbar-thumb{ background:rgba(200,117,31,0.35); border-radius:4px; }
+.kc-chat-body::-webkit-scrollbar-track{ background:transparent; }
+
+/* Messages */
+.kc-msg{
+  max-width:84%; padding:11px 14px; border-radius:16px; font-size:13.5px; line-height:1.55;
+  animation:kcMsgIn .35s var(--kc-ease) both; white-space:pre-wrap;
+}
+@keyframes kcMsgIn{
+  from{ opacity:0; transform:translateY(10px) scale(.98); }
+  to{ opacity:1; transform:translateY(0) scale(1); }
+}
+.kc-msg.bot{
+  align-self:flex-start; background:rgba(255,255,255,0.045);
+  border:1px solid var(--kc-white-12); color:var(--kc-white);
+  border-bottom-left-radius:5px;
+}
+.kc-msg.user{
+  align-self:flex-end; background:linear-gradient(135deg, var(--kc-copper), var(--kc-copper-lt));
+  color:#0a0a0a; font-weight:500; border-bottom-right-radius:5px;
+}
+
+/* Typing indicator */
+.kc-typing{
+  align-self:flex-start; display:flex; gap:4px; padding:13px 16px;
+  background:rgba(255,255,255,0.045); border:1px solid var(--kc-white-12);
+  border-radius:16px; border-bottom-left-radius:5px;
+  animation:kcMsgIn .3s var(--kc-ease) both;
+}
+.kc-typing span{
+  width:6px; height:6px; border-radius:50%; background:var(--kc-copper-lt);
+  animation:kcTypingDot 1.2s ease-in-out infinite;
+}
+.kc-typing span:nth-child(2){ animation-delay:.15s; }
+.kc-typing span:nth-child(3){ animation-delay:.3s; }
+@keyframes kcTypingDot{
+  0%,60%,100%{ transform:translateY(0); opacity:.4; }
+  30%{ transform:translateY(-4px); opacity:1; }
+}
+
+/* Quick replies */
+.kc-quick-replies{ display:flex; flex-wrap:wrap; gap:8px; align-self:flex-start; max-width:100%; }
+.kc-quick-btn{
+  padding:8px 14px; border-radius:999px; border:1px solid rgba(200,117,31,0.4);
+  background:rgba(200,117,31,0.08); color:var(--kc-copper-lt); font-size:12.5px;
+  cursor:pointer; transition:all .25s var(--kc-ease); font-family:inherit; font-weight:500;
+}
+.kc-quick-btn:hover{ background:rgba(200,117,31,0.2); border-color:var(--kc-copper-lt); transform:translateY(-1px); }
+
+/* Resumen / lead card */
+.kc-summary-card{
+  align-self:stretch; background:linear-gradient(155deg, rgba(200,117,31,0.12), rgba(255,255,255,0.03));
+  border:1px solid rgba(200,117,31,0.3); border-radius:16px; padding:16px;
+  animation:kcMsgIn .4s var(--kc-ease) both;
+}
+.kc-summary-title{
+  font-family:var(--f-head,'Space Grotesk',sans-serif); font-size:12px; font-weight:700;
+  letter-spacing:1.5px; color:var(--kc-copper-lt); text-transform:uppercase; margin-bottom:12px;
+  display:flex; align-items:center; gap:8px;
+}
+.kc-summary-title::before{ content:'⚡'; }
+.kc-summary-row{
+  display:flex; justify-content:space-between; gap:10px; padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,0.06); font-size:13px;
+  flex-wrap:wrap;
+}
+.kc-summary-row:last-child{ border-bottom:none; }
+.kc-summary-label{ color:var(--kc-white-60); }
+.kc-summary-value{ color:var(--kc-white); font-weight:600; text-align:right; }
+
+.kc-wa-btn{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  width:100%; margin-top:14px; padding:14px; border-radius:14px; border:none;
+  background:linear-gradient(135deg, #22C55E, var(--kc-wa));
+  color:#06190f; font-weight:700; font-size:14px; font-family:var(--f-head,'Space Grotesk',sans-serif);
+  cursor:pointer; transition:transform .25s var(--kc-ease), box-shadow .25s var(--kc-ease);
+  box-shadow:0 6px 22px rgba(34,197,94,0.35);
+  letter-spacing:.3px;
+}
+.kc-wa-btn:hover{ transform:translateY(-2px) scale(1.01); box-shadow:0 10px 28px rgba(34,197,94,0.45); }
+
+/* Footer / input */
+.kc-chat-footer{
+  flex-shrink:0; padding:12px 14px 14px; border-top:1px solid var(--kc-white-12);
+  background:rgba(0,0,0,0.25);
+}
+.kc-input-wrap{
+  display:flex; align-items:flex-end; gap:8px;
+  background:rgba(255,255,255,0.045); border:1px solid var(--kc-white-12);
+  border-radius:16px; padding:8px 8px 8px 14px;
+  transition:border-color .25s var(--kc-ease);
+}
+.kc-input-wrap:focus-within{ border-color:rgba(200,117,31,0.5); }
+.kc-input{
+  flex:1; background:none; border:none; outline:none; resize:none;
+  color:var(--kc-white); font-family:inherit; font-size:13.5px; line-height:1.5;
+  max-height:90px; padding:6px 0;
+}
+.kc-input::placeholder{ color:var(--kc-white-60); }
+.kc-send-btn{
+  width:36px; height:36px; border-radius:11px; border:none; flex-shrink:0;
+  background:linear-gradient(135deg, var(--kc-copper-lt), var(--kc-copper));
+  color:#0a0a0a; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:transform .2s var(--kc-ease), opacity .2s;
+}
+.kc-send-btn:hover{ transform:scale(1.08); }
+.kc-send-btn:disabled{ opacity:.4; cursor:default; transform:none; }
+.kc-footer-tag{
+  text-align:center; font-size:10.5px; color:var(--kc-white-60); margin-top:9px; letter-spacing:.3px;
+}
+.kc-footer-tag span{ color:var(--kc-copper-lt); font-weight:600; }
+
+/* Mobile */
+@media (max-width: 480px){
+  .kc-chat-window{
+    bottom:0; right:0; left:0; width:100%; max-width:100%;
+    height:92vh; height:92dvh; border-radius:18px 18px 0 0;
+    transform-origin:bottom center;
+  }
+  .kc-float-btn{ bottom:16px; right:16px; width:56px; height:56px; }
+  .kc-float-logo{ width:40px; height:40px; }
+  .kc-float-tooltip{ display:none; }
+  .kc-chat-header{ padding:14px 14px; }
+  .kc-header-name{ font-size:13px; }
+  .kc-header-status{ font-size:11px; }
+  .kc-avatar{ width:36px; height:36px; }
+  .kc-chat-body{ padding:14px; gap:10px; }
+  .kc-msg{ max-width:88%; font-size:13px; padding:10px 13px; }
+  .kc-summary-card{ padding:13px; }
+  .kc-wa-btn{ padding:13px; font-size:13.5px; }
+  .kc-chat-footer{ padding:10px 12px 12px; }
+@media (max-width: 480px){
+  .kc-input{ font-size:16px; }
+}
+  .kc-footer-tag{ font-size:10px; }
+}
+
+@media (max-width: 360px){
+  .kc-msg{ max-width:92%; font-size:12.5px; }
+  .kc-summary-row{ font-size:12px; }
+  .kc-quick-btn{ font-size:12px; padding:7px 12px; }
+}
+</style>
+
+<!-- ============ LÓGICA / JAVASCRIPT ============ -->
+<script>
+(function(){
+
+  /* =========================================================
+     CONFIGURACIÓN
+  ========================================================= */
+  const KC_CONFIG = {
+    whatsappNumber: '584142521941', // mismo número usado en el sitio
+    storageKey: 'kartec_ai_chat_v1',
+    groq: {
+      // Preparado para integración futura con Groq API.
+      enabled: false,
+      apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: '', // NUNCA exponer la key real en frontend en producción
+      model: 'llama-3.3-70b-versatile'
+    }
+  };
+
+  /* =========================================================
+     ESTADO / MEMORIA
+  ========================================================= */
+  const KC_FIELDS = ['nombre','marca','modelo','anio','motor','combustible','servicio','ciudad','telefono','disponibilidad'];
+
+  let kcState = {
+    messages: [],      // historial { role:'bot'|'user', text }
+    data: {},          // datos recolectados
+    step: 'nombre',    // siguiente dato a pedir
+    summaryShown: false,
+    opened: false
+  };
+
+  /* =========================================================
+     PERSISTENCIA (localStorage)
+  ========================================================= */
+  function kcSaveState(){
+    try{ localStorage.setItem(KC_CONFIG.storageKey, JSON.stringify(kcState)); }catch(e){}
+  }
+  function kcLoadState(){
+    try{
+      const raw = localStorage.getItem(KC_CONFIG.storageKey);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(parsed && parsed.messages) kcState = Object.assign(kcState, parsed);
+      }
+    }catch(e){}
+  }
+
+  /* =========================================================
+     UTILIDADES DOM
+  ========================================================= */
+  const $body = () => document.getElementById('kcChatBody');
+
+  function kcScrollBottom(){
+    const b = $body();
+    requestAnimationFrame(()=>{ b.scrollTop = b.scrollHeight; });
+  }
+
+  function appendMessage(text, role, opts){
+    opts = opts || {};
+    kcState.messages.push({ role, text, type: opts.type || 'text' });
+    if(opts.persist !== false) kcSaveState();
+    kcRenderMessage(text, role, opts);
+  }
+
+  function kcRenderMessage(text, role, opts){
+    opts = opts || {};
+    const b = $body();
+    const div = document.createElement('div');
+    div.className = 'kc-msg ' + (role === 'user' ? 'user' : 'bot');
+    div.textContent = text;
+    b.appendChild(div);
+    kcScrollBottom();
+  }
+
+  function kcShowTyping(){
+    const b = $body();
+    const t = document.createElement('div');
+    t.className = 'kc-typing';
+    t.id = 'kcTypingIndicator';
+    t.innerHTML = '<span></span><span></span><span></span>';
+    b.appendChild(t);
+    kcScrollBottom();
+  }
+  function kcHideTyping(){
+    const t = document.getElementById('kcTypingIndicator');
+    if(t) t.remove();
+  }
+
+  function kcBotReply(text, delayMs){
+    kcShowTyping();
+    const delay = delayMs || (600 + Math.random()*700);
+    setTimeout(()=>{
+      kcHideTyping();
+      appendMessage(text, 'bot');
+      kcMaybeShowQuickReplies();
+    }, delay);
+  }
+
+  function kcRenderQuickReplies(options){
+    const b = $body();
+    const wrap = document.createElement('div');
+    wrap.className = 'kc-quick-replies';
+    options.forEach(opt=>{
+      const btn = document.createElement('button');
+      btn.className = 'kc-quick-btn';
+      btn.textContent = opt;
+      btn.onclick = ()=>{
+        wrap.remove();
+        appendMessage(opt, 'user');
+        kcProcessUserInput(opt);
+      };
+      wrap.appendChild(btn);
+    });
+    b.appendChild(wrap);
+    kcScrollBottom();
+  }
+
+  /* =========================================================
+     PREGUNTAS — UNA POR VEZ
+  ========================================================= */
+  const KC_QUESTIONS = {
+    nombre: { text: "¿Con quién tengo el gusto?" },
+    marca: { text: "Buenísimo, {nombre}. Contame, ¿qué marca es tu vehículo?" },
+    modelo: { text: "Perfecto, ¿y qué modelo es?" },
+    anio: { text: "¿De qué año es?" },
+    motor: { text: "¿Qué motor tiene? (cilindrada / código, ej: 2.8 TD, 2.0 TDI, etc.)" },
+    combustible: {
+      text: "¿Es diésel o gasolina?",
+      quick: ['Diésel','Gasolina']
+    },
+    servicio: {
+      text: "¿Qué servicio te interesa? Tenemos Stage 1, Stage 2, reprogramación ECU, Unichip, y soluciones de torque/consumo.",
+      quick: ['Stage 1','Stage 2','Reprogramación ECU','Unichip']
+    },
+    ciudad: { text: "¿Desde qué ciudad nos escribís?" },
+    telefono: { text: "Dejame tu número de WhatsApp para que el equipo técnico te contacte directo." },
+    disponibilidad: {
+      text: "Último dato: ¿qué disponibilidad tenés para coordinar el turno?",
+      quick: ['Esta semana','La próxima semana','Lo antes posible']
+    }
+  };
+
+  function kcNextStep(){
+    for(const f of KC_FIELDS){
+      if(!kcState.data[f]) return f;
+    }
+    return null;
+  }
+
+  function kcAskCurrentStep(){
+    const step = kcNextStep();
+    kcState.step = step;
+    kcSaveState();
+    if(!step){
+      kcMaybeShowSummary();
+      return;
+    }
+    let q = KC_QUESTIONS[step].text;
+    q = q.replace('{nombre}', kcState.data.nombre || '');
+    kcBotReply(q);
+  }
+
+  function kcMaybeShowQuickReplies(){
+    const step = kcState.step;
+    if(step && KC_QUESTIONS[step] && KC_QUESTIONS[step].quick){
+      setTimeout(()=> kcRenderQuickReplies(KC_QUESTIONS[step].quick), 150);
+    }
+  }
+
+  /* =========================================================
+     DETECCIÓN DE INTENCIÓN (precio / potencia / turno, etc.)
+  ========================================================= */
+  const KC_INTENT_KEYWORDS = ['precio','costo','cuesta','vale','valor','turno','disponibilidad','disponible','potencia','ganancia','gana','ganancias','cuanto','cuánto'];
+
+  function kcDetectIntent(text){
+    const t = text.toLowerCase();
+    return KC_INTENT_KEYWORDS.some(k => t.includes(k));
+  }
+
+  const KC_INTENT_RESPONSES = {
+    precio: "El valor depende del vehículo, motor y servicio elegido — cada caso se cotiza de forma personalizada.",
+    potencia: "La ganancia de potencia y torque varía según el motor y la etapa (Stage 1, Stage 2, etc.) — con datos exactos del auto te puedo orientar mejor.",
+    turno: "Para coordinar el turno necesito algunos datos de tu vehículo y de contacto, así el equipo técnico te confirma horario disponible."
+  };
+
+  function kcIntentReply(text){
+    const t = text.toLowerCase();
+    let base;
+    if(t.includes('potencia') || t.includes('gana') || t.includes('ganancia')) base = KC_INTENT_RESPONSES.potencia;
+    else if(t.includes('turno') || t.includes('disponib')) base = KC_INTENT_RESPONSES.turno;
+    else base = KC_INTENT_RESPONSES.precio;
+    return base;
+  }
+
+  /* =========================================================
+     PROCESAMIENTO DE INPUT DEL USUARIO
+  ========================================================= */
+  function kcProcessUserInput(rawText){
+    const text = rawText.trim();
+    if(!text) return;
+
+    // ¿Ya tenemos todos los datos clave? -> no preguntar más, ir a cierre
+    const step = kcState.step;
+
+    // Detección de intención (consulta de precio/potencia/turno)
+    if(kcDetectIntent(text) && step && !kcState.data[step]){
+      kcBotReply(kcIntentReply(text), 500);
+      setTimeout(()=>{ kcAskCurrentStep(); }, 1500);
+      return;
+    }
+
+    // Guardar respuesta en el campo correspondiente
+    if(step && KC_FIELDS.includes(step)){
+      let value = text;
+      if(step === 'combustible'){
+        value = /dies|gasoil|diesel/i.test(text) ? 'Diésel' : (/gas|nafta/i.test(text) ? 'Gasolina' : text);
+      }
+      kcState.data[step] = value;
+      kcSaveState();
+    } else {
+      // Si ya tenemos todo, manejar como charla libre + reforzar cierre
+      kcBotReply("Con esos datos ya tengo lo necesario para que el equipo te contacte. ¿Confirmamos por WhatsApp?", 500);
+      return;
+    }
+
+    // Siguiente paso
+    setTimeout(()=> kcAskCurrentStep(), 400);
+  }
+
+  /* =========================================================
+     RESUMEN DE DATOS
+  ========================================================= */
+  const KC_LABELS = {
+    nombre:'Nombre', marca:'Vehículo', modelo:'Modelo', anio:'Año', motor:'Motor',
+    combustible:'Combustible', servicio:'Servicio', ciudad:'Ciudad',
+    telefono:'Teléfono', disponibilidad:'Disponibilidad'
+  };
+
+  function kcHasMinimumData(){
+    const required = ['nombre','marca','modelo','anio','motor','servicio','telefono'];
+    return required.every(f => !!kcState.data[f]);
+  }
+
+  function createLeadSummary(){
+    const d = kcState.data;
+    const vehiculo = [d.marca, d.modelo, d.anio].filter(Boolean).join(' ');
+    return {
+      nombre: d.nombre || '-',
+      vehiculo: vehiculo || '-',
+      motor: d.motor || '-',
+      combustible: d.combustible || '-',
+      servicio: d.servicio || '-',
+      ciudad: d.ciudad || '-',
+      telefono: d.telefono || '-',
+      disponibilidad: d.disponibilidad || '-'
+    };
+  }
+
+  function kcRenderSummaryCard(){
+    const s = createLeadSummary();
+    const b = $body();
+    const card = document.createElement('div');
+    card.className = 'kc-summary-card';
+
+    const title = document.createElement('div');
+    title.className = 'kc-summary-title';
+    title.textContent = 'Datos Recopilados';
+    card.appendChild(title);
+
+    const rows = [
+      ['Nombre', s.nombre],
+      ['Vehículo', s.vehiculo],
+      ['Motor', s.motor],
+      ['Combustible', s.combustible],
+      ['Servicio', s.servicio],
+      ['Ciudad', s.ciudad],
+      ['Teléfono', s.telefono],
+      ['Disponibilidad', s.disponibilidad]
+    ];
+    rows.forEach(([label,value])=>{
+      if(value === '-') return;
+      const row = document.createElement('div');
+      row.className = 'kc-summary-row';
+      row.innerHTML = `<span class="kc-summary-label">${label}</span><span class="kc-summary-value"></span>`;
+      row.querySelector('.kc-summary-value').textContent = value;
+      card.appendChild(row);
+    });
+
+    const waBtn = document.createElement('button');
+    waBtn.className = 'kc-wa-btn';
+    waBtn.innerHTML = '📲 Enviar consulta por WhatsApp';
+    waBtn.onclick = generateWhatsappLead;
+    card.appendChild(waBtn);
+
+    b.appendChild(card);
+    kcScrollBottom();
+  }
+
+  function kcMaybeShowSummary(){
+    if(kcState.summaryShown) return;
+    if(!kcHasMinimumData()) return;
+    kcState.summaryShown = true;
+    kcSaveState();
+    kcShowTyping();
+    setTimeout(()=>{
+      kcHideTyping();
+      appendMessage("Excelente, con esto ya tengo todo para que el equipo técnico te contacte. Te dejo el resumen 👇", 'bot');
+      kcRenderSummaryCard();
+    }, 900);
+  }
+
+  /* =========================================================
+     GENERAR LEAD DE WHATSAPP
+  ========================================================= */
+  function generateWhatsappLead(){
+    const s = createLeadSummary();
+    const lines = [
+      '🔥 NUEVA CONSULTA KARTEC',
+      '',
+      `Nombre: ${s.nombre}`,
+      `Vehículo: ${kcState.data.marca || ''} ${kcState.data.modelo || ''}`.trim(),
+      `Año: ${kcState.data.anio || '-'}`,
+      `Motor: ${s.motor}`,
+      `Combustible: ${s.combustible}`,
+      `Servicio solicitado: ${s.servicio}`,
+      `Ciudad: ${s.ciudad}`,
+      `Teléfono: ${s.telefono}`,
+      `Disponibilidad: ${s.disponibilidad}`,
+      '',
+      'Consulta generada desde la IA del sitio web.'
+    ];
+    const message = lines.join('\n');
+    const url = `https://wa.me/${KC_CONFIG.whatsappNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  }
+  window.generateWhatsappLead = generateWhatsappLead;
+
+  /* =========================================================
+     ENVÍO DE MENSAJE DEL USUARIO
+  ========================================================= */
+  function kcUserSend(){
+    const input = document.getElementById('kcInput');
+    const text = input.value.trim();
+    if(!text) return;
+    appendMessage(text, 'user');
+    input.value = '';
+    kcAutoGrow(input);
+    sendMessage(text);
+  }
+  window.kcUserSend = kcUserSend;
+
+  function kcHandleKey(e){
+    if(e.key === 'Enter' && !e.shiftKey){
+      e.preventDefault();
+      kcUserSend();
+    }
+  }
+  window.kcHandleKey = kcHandleKey;
+
+  function kcAutoGrow(el){
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 90) + 'px';
+  }
+  window.kcAutoGrow = kcAutoGrow;
+
+  /* =========================================================
+     sendMessage — punto central de la conversación
+     (Preparado para integración con Groq API)
+  ========================================================= */
+  function sendMessage(text){
+    // Si ya se mostró el resumen, dar respuestas de cierre/charla libre
+    if(kcState.summaryShown){
+      kcBotReply("Ya tengo tus datos registrados. Tocá el botón de WhatsApp arriba para que el equipo técnico continúe la conversación 🚀", 500);
+      return;
+    }
+
+    if(KC_CONFIG.groq.enabled){
+      kcSendMessageGroq(text);
+      return;
+    }
+
+    // Flujo local (sin IA externa) — recolección guiada
+    kcProcessUserInput(text);
+  }
+  window.sendMessage = sendMessage;
+
+  /* =========================================================
+     INTEGRACIÓN GROQ (estructura preparada, deshabilitada)
+  ========================================================= */
+  async function kcSendMessageGroq(userText){
+    kcShowTyping();
+    try{
+      const systemPrompt = `Eres el "Asesor de Performance KARTEC", un asesor comercial experto en reprogramaciones ECU, Unichip, Stage 1, Stage 2, torque, potencia, DPF, EGR y consumo. Hablas como una persona real, nunca dices que eres una IA o un chatbot. Tu objetivo es recolectar progresivamente: nombre, marca, modelo, año, motor, combustible, servicio, ciudad, teléfono y disponibilidad, una sola pregunta por vez, sin repetir lo ya obtenido. Datos ya obtenidos: ${JSON.stringify(kcState.data)}.`;
+
+      const history = kcState.messages.slice(-10).map(m=>({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }));
+
+      const response = await fetch(KC_CONFIG.groq.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${KC_CONFIG.groq.apiKey}`
+        },
+        body: JSON.stringify({
+          model: KC_CONFIG.groq.model,
+          messages: [{ role:'system', content: systemPrompt }, ...history, { role:'user', content:userText }],
+          max_tokens: 300
+        })
+      });
+      const data = await response.json();
+      const reply = data?.choices?.[0]?.message?.content || "Disculpá, ¿podrías repetirlo?";
+      kcHideTyping();
+      appendMessage(reply, 'bot');
+    }catch(err){
+      kcHideTyping();
+      appendMessage("Tuvimos un problema de conexión. ¿Podés intentar nuevamente?", 'bot');
+      console.error('KARTEC AI Groq error:', err);
+    }
+  }
+
+  /* =========================================================
+     APERTURA / CIERRE DEL CHAT
+  ========================================================= */
+  function kcToggleChat(){
+    const win = document.getElementById('kcChatWindow');
+    const btn = document.getElementById('kcFloatBtn');
+    const willOpen = !win.classList.contains('open');
+    win.classList.toggle('open');
+    btn.classList.toggle('open');
+    if(willOpen){
+      kcState.opened = true;
+      kcSaveState();
+      kcInitConversationIfNeeded();
+      setTimeout(()=> document.getElementById('kcInput').focus(), 380);
+    }
+  }
+  window.kcToggleChat = kcToggleChat;
+
+  /* =========================================================
+     REINICIAR CONVERSACIÓN
+  ========================================================= */
+  function kcResetChat(){
+    if(!confirm('¿Reiniciar la conversación?')) return;
+    localStorage.removeItem(KC_CONFIG.storageKey);
+    kcState = { messages:[], data:{}, step:'nombre', summaryShown:false, opened:true };
+    $body().innerHTML = '';
+    kcInitConversationIfNeeded(true);
+  }
+  window.kcResetChat = kcResetChat;
+
+  /* =========================================================
+     INICIALIZACIÓN
+  ========================================================= */
+  const KC_WELCOME = "Hola 👋\n\nBienvenido a KARTEC.\n\nSoy uno de los asesores de performance.\n\n¿Con quién tengo el gusto?";
+
+  function kcInitConversationIfNeeded(force){
+    const b = $body();
+    if(kcState.messages.length > 0 && !force){
+      // Re-render historial guardado
+      b.innerHTML = '';
+      kcState.messages.forEach(m=> kcRenderMessage(m.text, m.role));
+      if(kcState.summaryShown) kcRenderSummaryCard();
+      kcScrollBottom();
+      return;
+    }
+    // Conversación nueva
+    kcShowTyping();
+    setTimeout(()=>{
+      kcHideTyping();
+      appendMessage(KC_WELCOME, 'bot');
+    }, 700);
+  }
+
+  /* =========================================================
+     TOOLTIP — mostrar una vez al cargar
+  ========================================================= */
+  function kcShowTooltipOnce(){
+    const tip = document.getElementById('kcTooltip');
+    setTimeout(()=>{
+      tip.classList.add('kc-show-once');
+      setTimeout(()=> tip.classList.remove('kc-show-once'), 4500);
+    }, 1800);
+  }
+
+  /* =========================================================
+     INIT
+  ========================================================= */
+  document.addEventListener('DOMContentLoaded', function(){
+    kcLoadState();
+    if(!kcState.opened) kcShowTooltipOnce();
+  });
+
+})();
+</script>
