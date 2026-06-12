@@ -2785,26 +2785,16 @@ document.addEventListener('keydown',function(e){
      CONFIGURACIÓN
   ========================================================= */
   const KC_CONFIG = {
-    whatsappNumber: '584142521941', // mismo número usado en el sitio
-    storageKey: 'kartec_ai_chat_v1',
-    groq: {
-      // Preparado para integración futura con Groq API.
-      enabled: false,
-      apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
-      apiKey: '', // NUNCA exponer la key real en frontend en producción
-      model: 'llama-3.3-70b-versatile'
-    }
+    whatsappNumber: '584142521941',
+    storageKey: 'kartec_ai_chat_v2',
   };
 
   /* =========================================================
      ESTADO / MEMORIA
   ========================================================= */
-  const KC_FIELDS = ['nombre','marca','modelo','anio','motor','combustible','servicio','ciudad','telefono','disponibilidad'];
-
   let kcState = {
     messages: [],      // historial { role:'bot'|'user', text }
-    data: {},          // datos recolectados
-    step: 'nombre',    // siguiente dato a pedir
+    data: {},          // datos detectados { nombre, vehiculo, problema, servicio, ciudad, telefono }
     summaryShown: false,
     opened: false
   };
@@ -2835,18 +2825,18 @@ document.addEventListener('keydown',function(e){
     requestAnimationFrame(()=>{ b.scrollTop = b.scrollHeight; });
   }
 
-  function appendMessage(text, role, opts){
-    opts = opts || {};
-    kcState.messages.push({ role, text, type: opts.type || 'text' });
-    if(opts.persist !== false) kcSaveState();
-    kcRenderMessage(text, role, opts);
+  function appendMessage(text, role){
+    kcState.messages.push({ role, text });
+    kcSaveState();
+    kcRenderMessage(text, role);
   }
 
-  function kcRenderMessage(text, role, opts){
-    opts = opts || {};
+  function kcRenderMessage(text, role){
     const b = $body();
     const div = document.createElement('div');
     div.className = 'kc-msg ' + (role === 'user' ? 'user' : 'bot');
+    // Support newlines
+    div.style.whiteSpace = 'pre-wrap';
     div.textContent = text;
     b.appendChild(div);
     kcScrollBottom();
@@ -2854,7 +2844,9 @@ document.addEventListener('keydown',function(e){
 
   function kcShowTyping(){
     const b = $body();
-    const t = document.createElement('div');
+    let t = document.getElementById('kcTypingIndicator');
+    if(t) return;
+    t = document.createElement('div');
     t.className = 'kc-typing';
     t.id = 'kcTypingIndicator';
     t.innerHTML = '<span></span><span></span><span></span>';
@@ -2866,205 +2858,161 @@ document.addEventListener('keydown',function(e){
     if(t) t.remove();
   }
 
-  function kcBotReply(text, delayMs){
+  /* =========================================================
+     SYSTEM PROMPT — El corazón del asesor
+  ========================================================= */
+  function buildSystemPrompt(){
+    const collectedJSON = JSON.stringify(kcState.data);
+    return `Eres Matías, asesor senior de performance automotriz en KARTEC (Venezuela). Llevas 8 años optimizando motores: ECU, Stage 1, Stage 2, Unichip, eliminación DPF/EGR, torque, consumo.
+
+PERSONALIDAD:
+- Hablas como una persona real: directo, entusiasta, técnico pero accesible.
+- Nunca dices que eres una IA ni un bot.
+- Opinás, recomendás, hacés observaciones técnicas espontáneas.
+- Cada vez que el usuario menciona su vehículo, reaccionás con conocimiento genuino.
+- Respondés primero con valor técnico, luego (si aplica) hacés UNA sola pregunta.
+
+REGLA PRINCIPAL — "Valor antes que dato":
+Antes de pedir cualquier información, aportás algo útil relacionado con lo que el usuario dijo.
+Ejemplo correcto:
+  Usuario: "Tengo una Hilux 2.8"
+  Vos: "Ese motor GD6 es una bestia cuando se optimiza bien. En Stage 1 logramos entre 50 y 70 Nm más de torque, y la respuesta a medio acelerador cambia por completo. ¿La usás para trabajo o uso personal?"
+
+NO HACÉS INTERROGATORIOS. Una pregunta por mensaje, siempre.
+
+FLUJO NATURAL DE CONVERSACIÓN:
+Fase 1 — Entender el vehículo y el problema (conversar, no encuestar):
+  - Qué vehículo tiene (marca, modelo, año, motor)
+  - Qué problema o mejora busca
+  - Qué servicio le interesa
+
+Fase 2 — Asesorar con profundidad:
+  - Explicá qué gana con la modificación
+  - Números reales: caballos, torque, consumo
+  - Comparativas entre opciones (Stage 1 vs Stage 2, ECU vs Unichip, etc.)
+
+Fase 3 — Solo cuando detectés INTERÉS REAL (el usuario pregunta precio, quiere turno, pide más info concreta), empezás a recopilar datos de contacto, de manera natural:
+  - Primero nombre: "Para que uno de los especialistas pueda revisar tu caso, ¿cómo te llamas?"
+  - Luego ciudad: "¿Y desde qué ciudad nos escribís?"
+  - Luego teléfono: "¿A qué número de WhatsApp te mandamos la info?"
+
+DATOS YA RECOPILADOS (no volver a preguntar):
+${collectedJSON === '{}' ? 'Ninguno aún.' : collectedJSON}
+
+CUANDO TENÉS nombre + ciudad + teléfono:
+Respondé con un mensaje de cierre cálido y terminá con exactamente este marcador en una línea aparte:
+[KARTEC_LEAD_READY]
+
+SERVICIOS KARTEC que podés mencionar:
+- Stage 1: reprogramación ECU stock, +15-30% potencia, +20-40% torque, mejor consumo
+- Stage 2: con modificaciones físicas (filtro, escape, intercooler), +30-50% potencia
+- Unichip: módulo externo, reversible, ideal para garantías activas
+- Eliminación DPF/EGR: para motores diésel con problemas de hollín o temperatura
+- Optimización de consumo: para flotas o uso intensivo
+
+RESPUESTAS CORTAS y naturales (máx 4-5 líneas por mensaje). No uses listas con guiones. Escribí como en una conversación real por chat.`;
+  }
+
+  /* =========================================================
+     LLAMADA A LA API DE GROQ
+  ========================================================= */
+  async function kcCallAI(userText){
     kcShowTyping();
-    const delay = delayMs || (600 + Math.random()*700);
-    setTimeout(()=>{
+
+    const history = kcState.messages
+      .filter(m => m.text && m.text.trim())
+      .slice(-20)
+      .map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }));
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 1000,
+          messages: [
+            { role: 'system', content: buildSystemPrompt() },
+            ...history
+          ]
+        })
+      });
+
+      const data = await response.json();
       kcHideTyping();
-      appendMessage(text, 'bot');
-      kcMaybeShowQuickReplies();
-    }, delay);
-  }
 
-  function kcRenderQuickReplies(options){
-    const b = $body();
-    const wrap = document.createElement('div');
-    wrap.className = 'kc-quick-replies';
-    options.forEach(opt=>{
-      const btn = document.createElement('button');
-      btn.className = 'kc-quick-btn';
-      btn.textContent = opt;
-      btn.onclick = ()=>{
-        wrap.remove();
-        appendMessage(opt, 'user');
-        kcProcessUserInput(opt);
-      };
-      wrap.appendChild(btn);
-    });
-    b.appendChild(wrap);
-    kcScrollBottom();
-  }
-
-  /* =========================================================
-     PREGUNTAS — UNA POR VEZ
-  ========================================================= */
-  const KC_QUESTIONS = {
-    nombre: { text: "¿Con quién tengo el gusto?" },
-    marca: { text: "Buenísimo, {nombre}. Contame, ¿qué marca es tu vehículo?" },
-    modelo: { text: "Perfecto, ¿y qué modelo es?" },
-    anio: { text: "¿De qué año es?" },
-    motor: { text: "¿Qué motor tiene? (cilindrada / código, ej: 2.8 TD, 2.0 TDI, etc.)" },
-    combustible: {
-      text: "¿Es diésel o gasolina?",
-      quick: ['Diésel','Gasolina']
-    },
-    servicio: {
-      text: "¿Qué servicio te interesa? Tenemos Stage 1, Stage 2, reprogramación ECU, Unichip, y soluciones de torque/consumo.",
-      quick: ['Stage 1','Stage 2','Reprogramación ECU','Unichip']
-    },
-    ciudad: { text: "¿Desde qué ciudad nos escribís?" },
-    telefono: { text: "Dejame tu número de WhatsApp para que el equipo técnico te contacte directo." },
-    disponibilidad: {
-      text: "Último dato: ¿qué disponibilidad tenés para coordinar el turno?",
-      quick: ['Esta semana','La próxima semana','Lo antes posible']
-    }
-  };
-
-  function kcNextStep(){
-    for(const f of KC_FIELDS){
-      if(!kcState.data[f]) return f;
-    }
-    return null;
-  }
-
-  function kcAskCurrentStep(){
-    const step = kcNextStep();
-    kcState.step = step;
-    kcSaveState();
-    if(!step){
-      kcMaybeShowSummary();
-      return;
-    }
-    let q = KC_QUESTIONS[step].text;
-    q = q.replace('{nombre}', kcState.data.nombre || '');
-    kcBotReply(q);
-  }
-
-  function kcMaybeShowQuickReplies(){
-    const step = kcState.step;
-    if(step && KC_QUESTIONS[step] && KC_QUESTIONS[step].quick){
-      setTimeout(()=> kcRenderQuickReplies(KC_QUESTIONS[step].quick), 150);
-    }
-  }
-
-  /* =========================================================
-     DETECCIÓN DE INTENCIÓN (precio / potencia / turno, etc.)
-  ========================================================= */
-  const KC_INTENT_KEYWORDS = ['precio','costo','cuesta','vale','valor','turno','disponibilidad','disponible','potencia','ganancia','gana','ganancias','cuanto','cuánto'];
-
-  function kcDetectIntent(text){
-    const t = text.toLowerCase();
-    return KC_INTENT_KEYWORDS.some(k => t.includes(k));
-  }
-
-  const KC_INTENT_RESPONSES = {
-    precio: "El valor depende del vehículo, motor y servicio elegido — cada caso se cotiza de forma personalizada.",
-    potencia: "La ganancia de potencia y torque varía según el motor y la etapa (Stage 1, Stage 2, etc.) — con datos exactos del auto te puedo orientar mejor.",
-    turno: "Para coordinar el turno necesito algunos datos de tu vehículo y de contacto, así el equipo técnico te confirma horario disponible."
-  };
-
-  function kcIntentReply(text){
-    const t = text.toLowerCase();
-    let base;
-    if(t.includes('potencia') || t.includes('gana') || t.includes('ganancia')) base = KC_INTENT_RESPONSES.potencia;
-    else if(t.includes('turno') || t.includes('disponib')) base = KC_INTENT_RESPONSES.turno;
-    else base = KC_INTENT_RESPONSES.precio;
-    return base;
-  }
-
-  /* =========================================================
-     PROCESAMIENTO DE INPUT DEL USUARIO
-  ========================================================= */
-  function kcProcessUserInput(rawText){
-    const text = rawText.trim();
-    if(!text) return;
-
-    // ¿Ya tenemos todos los datos clave? -> no preguntar más, ir a cierre
-    const step = kcState.step;
-
-    // Detección de intención (consulta de precio/potencia/turno)
-    if(kcDetectIntent(text) && step && !kcState.data[step]){
-      kcBotReply(kcIntentReply(text), 500);
-      setTimeout(()=>{ kcAskCurrentStep(); }, 1500);
-      return;
-    }
-
-    // Guardar respuesta en el campo correspondiente
-    if(step && KC_FIELDS.includes(step)){
-      let value = text;
-      if(step === 'combustible'){
-        value = /dies|gasoil|diesel/i.test(text) ? 'Diésel' : (/gas|nafta/i.test(text) ? 'Gasolina' : text);
+      if(!response.ok){
+        console.error('KARTEC AI error:', data);
+        appendMessage("Disculpá, tuvimos un problema de conexión. ¿Podés intentar de nuevo?", 'bot');
+        return;
       }
-      kcState.data[step] = value;
-      kcSaveState();
-    } else {
-      // Si ya tenemos todo, manejar como charla libre + reforzar cierre
-      kcBotReply("Con esos datos ya tengo lo necesario para que el equipo te contacte. ¿Confirmamos por WhatsApp?", 500);
-      return;
-    }
 
-    // Siguiente paso
-    setTimeout(()=> kcAskCurrentStep(), 400);
+      const rawReply = data?.choices?.[0]?.message?.content || "¿Podés repetir eso?";
+
+      // Detectar si la IA indica que el lead está listo
+      if(rawReply.includes('[KARTEC_LEAD_READY]')){
+        const cleanReply = rawReply.replace('[KARTEC_LEAD_READY]', '').trim();
+        appendMessage(cleanReply, 'bot');
+        kcParseDataFromHistory();
+        if(!kcState.summaryShown){
+          kcState.summaryShown = true;
+          kcSaveState();
+          setTimeout(()=> kcRenderSummaryCard(), 800);
+        }
+        return;
+      }
+
+      appendMessage(rawReply, 'bot');
+      kcParseDataFromHistory();
+
+    } catch(err) {
+      kcHideTyping();
+      appendMessage("Tuvimos un problema de conexión. ¿Podés intentar nuevamente?", 'bot');
+      console.error('KARTEC AI error:', err);
+    }
   }
 
   /* =========================================================
-     RESUMEN DE DATOS
+     EXTRACCIÓN PROGRESIVA DE DATOS DEL HISTORIAL
+     (Para popular kcState.data sin interrumpir la conversación)
   ========================================================= */
-  const KC_LABELS = {
-    nombre:'Nombre', marca:'Vehículo', modelo:'Modelo', anio:'Año', motor:'Motor',
-    combustible:'Combustible', servicio:'Servicio', ciudad:'Ciudad',
-    telefono:'Teléfono', disponibilidad:'Disponibilidad'
-  };
+  function kcParseDataFromHistory(){
+    // Extraemos datos leyendo lo que la IA ya conoce a través del historial
+    // Usamos heurísticas simples sobre las respuestas del usuario
+    const allUserMessages = kcState.messages
+      .filter(m => m.role === 'user')
+      .map(m => m.text)
+      .join(' ');
 
-  function kcHasMinimumData(){
-    const required = ['nombre','marca','modelo','anio','motor','servicio','telefono'];
-    return required.every(f => !!kcState.data[f]);
+    // Teléfono: buscar secuencias de dígitos de 7+ caracteres
+    if(!kcState.data.telefono){
+      const phoneMatch = allUserMessages.match(/\b(\+?[\d\s\-().]{7,})\b/);
+      if(phoneMatch){
+        const cleaned = phoneMatch[1].replace(/\s/g,'');
+        if(cleaned.replace(/\D/g,'').length >= 7){
+          kcState.data.telefono = phoneMatch[1].trim();
+        }
+      }
+    }
+
+    kcSaveState();
   }
 
-  function createLeadSummary(){
-    const d = kcState.data;
-    const vehiculo = [d.marca, d.modelo, d.anio].filter(Boolean).join(' ');
-    return {
-      nombre: d.nombre || '-',
-      vehiculo: vehiculo || '-',
-      motor: d.motor || '-',
-      combustible: d.combustible || '-',
-      servicio: d.servicio || '-',
-      ciudad: d.ciudad || '-',
-      telefono: d.telefono || '-',
-      disponibilidad: d.disponibilidad || '-'
-    };
-  }
-
+  /* =========================================================
+     RESUMEN Y WHATSAPP LEAD
+  ========================================================= */
   function kcRenderSummaryCard(){
-    const s = createLeadSummary();
     const b = $body();
     const card = document.createElement('div');
     card.className = 'kc-summary-card';
 
     const title = document.createElement('div');
     title.className = 'kc-summary-title';
-    title.textContent = 'Datos Recopilados';
+    title.textContent = 'Consulta Lista para Enviar';
     card.appendChild(title);
-
-    const rows = [
-      ['Nombre', s.nombre],
-      ['Vehículo', s.vehiculo],
-      ['Motor', s.motor],
-      ['Combustible', s.combustible],
-      ['Servicio', s.servicio],
-      ['Ciudad', s.ciudad],
-      ['Teléfono', s.telefono],
-      ['Disponibilidad', s.disponibilidad]
-    ];
-    rows.forEach(([label,value])=>{
-      if(value === '-') return;
-      const row = document.createElement('div');
-      row.className = 'kc-summary-row';
-      row.innerHTML = `<span class="kc-summary-label">${label}</span><span class="kc-summary-value"></span>`;
-      row.querySelector('.kc-summary-value').textContent = value;
-      card.appendChild(row);
-    });
 
     const waBtn = document.createElement('button');
     waBtn.className = 'kc-wa-btn';
@@ -3076,38 +3024,20 @@ document.addEventListener('keydown',function(e){
     kcScrollBottom();
   }
 
-  function kcMaybeShowSummary(){
-    if(kcState.summaryShown) return;
-    if(!kcHasMinimumData()) return;
-    kcState.summaryShown = true;
-    kcSaveState();
-    kcShowTyping();
-    setTimeout(()=>{
-      kcHideTyping();
-      appendMessage("Excelente, con esto ya tengo todo para que el equipo técnico te contacte. Te dejo el resumen 👇", 'bot');
-      kcRenderSummaryCard();
-    }, 900);
-  }
-
-  /* =========================================================
-     GENERAR LEAD DE WHATSAPP
-  ========================================================= */
   function generateWhatsappLead(){
-    const s = createLeadSummary();
+    // Construir resumen de la conversación para WhatsApp
+    const conversationSummary = kcState.messages
+      .slice(-30)
+      .map(m => `${m.role === 'user' ? '👤 Cliente' : '🔧 KARTEC'}: ${m.text}`)
+      .join('\n');
+
     const lines = [
-      '🔥 NUEVA CONSULTA KARTEC',
+      '🔥 NUEVA CONSULTA KARTEC — VIA IA WEB',
       '',
-      `Nombre: ${s.nombre}`,
-      `Vehículo: ${kcState.data.marca || ''} ${kcState.data.modelo || ''}`.trim(),
-      `Año: ${kcState.data.anio || '-'}`,
-      `Motor: ${s.motor}`,
-      `Combustible: ${s.combustible}`,
-      `Servicio solicitado: ${s.servicio}`,
-      `Ciudad: ${s.ciudad}`,
-      `Teléfono: ${s.telefono}`,
-      `Disponibilidad: ${s.disponibilidad}`,
+      conversationSummary,
       '',
-      'Consulta generada desde la IA del sitio web.'
+      '---',
+      'Consulta generada desde el Asesor IA del sitio web.'
     ];
     const message = lines.join('\n');
     const url = `https://wa.me/${KC_CONFIG.whatsappNumber}?text=${encodeURIComponent(message)}`;
@@ -3125,7 +3055,7 @@ document.addEventListener('keydown',function(e){
     appendMessage(text, 'user');
     input.value = '';
     kcAutoGrow(input);
-    sendMessage(text);
+    kcCallAI(text);
   }
   window.kcUserSend = kcUserSend;
 
@@ -3142,63 +3072,6 @@ document.addEventListener('keydown',function(e){
     el.style.height = Math.min(el.scrollHeight, 90) + 'px';
   }
   window.kcAutoGrow = kcAutoGrow;
-
-  /* =========================================================
-     sendMessage — punto central de la conversación
-     (Preparado para integración con Groq API)
-  ========================================================= */
-  function sendMessage(text){
-    // Si ya se mostró el resumen, dar respuestas de cierre/charla libre
-    if(kcState.summaryShown){
-      kcBotReply("Ya tengo tus datos registrados. Tocá el botón de WhatsApp arriba para que el equipo técnico continúe la conversación 🚀", 500);
-      return;
-    }
-
-    if(KC_CONFIG.groq.enabled){
-      kcSendMessageGroq(text);
-      return;
-    }
-
-    // Flujo local (sin IA externa) — recolección guiada
-    kcProcessUserInput(text);
-  }
-  window.sendMessage = sendMessage;
-
-  /* =========================================================
-     INTEGRACIÓN GROQ (estructura preparada, deshabilitada)
-  ========================================================= */
-  async function kcSendMessageGroq(userText){
-    kcShowTyping();
-    try{
-      const systemPrompt = `Eres el "Asesor de Performance KARTEC", un asesor comercial experto en reprogramaciones ECU, Unichip, Stage 1, Stage 2, torque, potencia, DPF, EGR y consumo. Hablas como una persona real, nunca dices que eres una IA o un chatbot. Tu objetivo es recolectar progresivamente: nombre, marca, modelo, año, motor, combustible, servicio, ciudad, teléfono y disponibilidad, una sola pregunta por vez, sin repetir lo ya obtenido. Datos ya obtenidos: ${JSON.stringify(kcState.data)}.`;
-
-      const history = kcState.messages.slice(-10).map(m=>({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text
-      }));
-
-      const response = await fetch(KC_CONFIG.groq.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${KC_CONFIG.groq.apiKey}`
-        },
-        body: JSON.stringify({
-          model: KC_CONFIG.groq.model,
-          messages: [{ role:'system', content: systemPrompt }, ...history, { role:'user', content:userText }],
-          max_tokens: 300
-        })
-      });
-      const data = await response.json();
-      const reply = data?.choices?.[0]?.message?.content || "Disculpá, ¿podrías repetirlo?";
-      kcHideTyping();
-      appendMessage(reply, 'bot');
-    }catch(err){
-      kcHideTyping();
-      appendMessage("Tuvimos un problema de conexión. ¿Podés intentar nuevamente?", 'bot');
-      console.error('KARTEC AI Groq error:', err);
-    }
-  }
 
   /* =========================================================
      APERTURA / CIERRE DEL CHAT
@@ -3224,7 +3097,7 @@ document.addEventListener('keydown',function(e){
   function kcResetChat(){
     if(!confirm('¿Reiniciar la conversación?')) return;
     localStorage.removeItem(KC_CONFIG.storageKey);
-    kcState = { messages:[], data:{}, step:'nombre', summaryShown:false, opened:true };
+    kcState = { messages:[], data:{}, summaryShown:false, opened:true };
     $body().innerHTML = '';
     kcInitConversationIfNeeded(true);
   }
@@ -3233,19 +3106,17 @@ document.addEventListener('keydown',function(e){
   /* =========================================================
      INICIALIZACIÓN
   ========================================================= */
-  const KC_WELCOME = "Hola 👋\n\nBienvenido a KARTEC.\n\nSoy uno de los asesores de performance.\n\n¿Con quién tengo el gusto?";
+  const KC_WELCOME = "Hola 👋 Soy Matías, del equipo técnico de KARTEC.\n\nContame, ¿en qué te puedo ayudar?";
 
   function kcInitConversationIfNeeded(force){
     const b = $body();
     if(kcState.messages.length > 0 && !force){
-      // Re-render historial guardado
       b.innerHTML = '';
       kcState.messages.forEach(m=> kcRenderMessage(m.text, m.role));
       if(kcState.summaryShown) kcRenderSummaryCard();
       kcScrollBottom();
       return;
     }
-    // Conversación nueva
     kcShowTyping();
     setTimeout(()=>{
       kcHideTyping();
